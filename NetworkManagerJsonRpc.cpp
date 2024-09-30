@@ -299,7 +299,6 @@ namespace WPEFramework
                     return Core::ERROR_BAD_REQUEST;
                 }
 
-                NMLOG_TRACE("mandatory parameter 'interface' is empty");
                 interface = m_primaryInterfaceCache.getValue();
             }
 
