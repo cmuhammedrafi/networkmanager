@@ -1,4 +1,4 @@
-#include "networkManagerClient.h"
+#include "NetworkManagerGnomeClient.h"
 #include "dbusConnectionManager.h"
 
 NetworkManagerClient::NetworkManagerClient() {
@@ -10,6 +10,24 @@ NetworkManagerClient::NetworkManagerClient() {
 
 NetworkManagerClient::~NetworkManagerClient() {
     NMLOG_INFO("NetworkManagerClient destroyed");
+}
+
+static void printKeyVariant(const char *setting_name, GVariant *setting)
+{
+    GVariantIter iter;
+    const char  *property_name;
+    GVariant    *value;
+    char        *printed_value;
+
+    NMLOG_VERBOSE("  %s:", setting_name);
+    g_variant_iter_init(&iter, setting);
+    while (g_variant_iter_next(&iter, "{&sv}", &property_name, &value)) {
+        printed_value = g_variant_print(value, FALSE);
+        if (strcmp(printed_value, "[]") != 0)
+            NMLOG_VERBOSE("    %s: %s", property_name, printed_value);
+        g_free(printed_value);
+        g_variant_unref(value);
+    }
 }
 
 static void fetssidandbssid(GVariant *setting80211, std::string &ssid, std::string &bssid)
@@ -31,7 +49,7 @@ static void fetssidandbssid(GVariant *setting80211, std::string &ssid, std::stri
 
             if (g_variant_iter_next(&bssid_iter, "s", &bssid_elem)) {
                 bssid = bssid_elem;
-                NMLOG_TRACE("BSSID: %s", bssid.c_str());
+                NMLOG_VERBOSE("BSSID: %s", bssid.c_str());
             }
 
             //g_variant_iter_free(&bssid_iter);
@@ -58,7 +76,7 @@ static bool fetchSSIDFromConnection(const char *path, std::list<std::string>& ss
 {
     GError *error = NULL;
     GDBusProxy *ConnProxy = NULL;
-    GVariant *settingsProxy= NULL, *connection= NULL, *s_con= NULL;
+    GVariant *settingsProxy= NULL, *connection= NULL, *sCon= NULL;
     bool isFound;
     const char *connId= NULL, *connTyp= NULL, *iface= NULL;
     ConnProxy = g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM,
@@ -89,14 +107,11 @@ static bool fetchSSIDFromConnection(const char *path, std::list<std::string>& ss
     }
 
     g_variant_get(settingsProxy, "(@a{sa{sv}})", &connection);
-    s_con = g_variant_lookup_value(connection, "connection", NULL);
-    g_assert(s_con != NULL);
-    isFound = g_variant_lookup(s_con, "type", "&s", &connTyp);
-    g_assert(isFound);
-    isFound = g_variant_lookup(s_con, "interface-name", "&s", &iface);
-    g_assert(isFound);
-
-    // NMLOG_TRACE("type= %s, iface= %s", connTyp, iface);
+    sCon = g_variant_lookup_value(connection, "connection", NULL);
+    g_assert(sCon != NULL); // TODO change error return
+    G_VARIANT_LOOKUP(sCon, "type", "&s", &connTyp);
+    G_VARIANT_LOOKUP(sCon, "interface-name", "&s", &iface);
+    NMLOG_VERBOSE("type= %s, iface= %s", connTyp, iface);
     if(strcmp(connTyp,"802-11-wireless") == 0 && strcmp(iface,"wlan0") == 0)
     {
         GVariant *setting = g_variant_lookup_value(connection, "802-11-wireless", NULL);
@@ -109,8 +124,8 @@ static bool fetchSSIDFromConnection(const char *path, std::list<std::string>& ss
         }
     }
 
-    if (s_con)
-        g_variant_unref(s_con);
+    if (sCon)
+        g_variant_unref(sCon);
     if (connection)
         g_variant_unref(connection);
     if (settingsProxy)
@@ -153,7 +168,7 @@ static bool fetchConnectionPaths(GDBusProxy *proxy, std::list<std::string>& path
     }
 
     for (int i = 0; paths[i]; i++) {
-        //NMLOG_INFO("Connection path: %s", paths[i]);
+        NMLOG_VERBOSE("Connection path: %s", paths[i]);
         pathsList.push_back(paths[i]);
     }
 
@@ -190,7 +205,7 @@ bool NetworkManagerClient::getKnownSSIDs(std::list<std::string>& ssids)
     if(fetchConnectionPaths(sProxy, paths))
     {
         for (const std::string& path : paths) {
-            NMLOG_TRACE("connection path %s", path.c_str());
+            NMLOG_VERBOSE("connection path %s", path.c_str());
             fetchSSIDFromConnection(path.c_str(), ssids);
         }
     }
@@ -201,3 +216,75 @@ bool NetworkManagerClient::getKnownSSIDs(std::list<std::string>& ssids)
          return false;
     return true;
 }
+
+bool NetworkManagerClient::getConnectedSSID()
+{
+    std::string wifiDevicePath;
+    if(!GnomeUtils::getDeviceByIpIface(dbusConnection.getConnection(),"wlan0", wifiDevicePath))
+    {
+        NMLOG_ERROR("no wifi device found");
+        return false;
+    }
+    NMLOG_TRACE("wifi device path %s", wifiDevicePath.c_str());
+    //TODO check active connection path and return properties
+    return true;
+}
+
+bool NetworkManagerClient::getavilableSSID(std::list<std::string>& ssids)
+{
+    // TODO Wifi device state fix it
+    GError* error = nullptr;
+    GDBusProxy* wProxy = nullptr;
+    std::string wifiDevicePath;
+
+    if(!GnomeUtils::getDeviceByIpIface(dbusConnection.getConnection(),"wlan0", wifiDevicePath))
+    {
+        NMLOG_ERROR("no wifi device found");
+        return false;
+    }
+    NMLOG_TRACE("wifi device path %s", wifiDevicePath.c_str());
+
+    wProxy = g_dbus_proxy_new_sync(dbusConnection.getConnection(),
+                            G_DBUS_PROXY_FLAGS_NONE,
+                            NULL,
+                            "org.freedesktop.NetworkManager",
+                            wifiDevicePath.c_str(),
+                            "org.freedesktop.NetworkManager.Device.Wireless",
+                            NULL, // GCancellable
+                            &error);
+
+    if (error) {
+        NMLOG_ERROR("Error creating proxy: %s", error->message);
+        g_error_free(error);
+        return false;
+    }
+
+    GVariant* result = g_dbus_proxy_call_sync(wProxy, "GetAccessPoints", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+    // TODO change to GetAllAccessPoints to include hidden ssid 
+    if (error) {
+        NMLOG_ERROR("Error creating proxy: %s", error->message);
+        g_error_free(error);
+        g_object_unref(wProxy);
+        return false;
+    }
+
+    GVariantIter* iter;
+    const gchar* apPath;
+    g_variant_get(result, "(ao)", &iter);
+
+    while (g_variant_iter_loop(iter, "o", &apPath)) {
+        apProperties apDetails;
+        NMLOG_VERBOSE("Access Point Path: %s", apPath);
+        if(!GnomeUtils::getApDetails(dbusConnection.getConnection(), apPath, apDetails))
+        {
+            NMLOG_WARNING("getApDetails failed");
+        }
+    }
+
+    g_variant_iter_free(iter);
+    g_variant_unref(result);
+    g_object_unref(wProxy);
+
+    return true;
+}
+

@@ -10,14 +10,18 @@ pkg_check_modules(GIO REQUIRED gio-2.0)
 include_directories(
     ${GLIB_INCLUDE_DIRS}
     ${GIO_INCLUDE_DIRS}
+    /usr/include/NetworkManager/libnm
 )
+
+# Force the compiler to include utils.h automatically
+add_compile_options(-include ${CMAKE_SOURCE_DIR}/utils.h)
 
 add_executable(
     NmDbusClient 
-    main.cpp 
+    main.cpp
     dbusConnectionManager.cpp 
-    networkManagerClient.cpp 
-    wpaSupplicantClient.cpp
+    NetworkManagerGnomeClient.cpp 
+    NetworkManagerGnomeUtils.cpp
 )
 
 target_link_libraries(

@@ -1,8 +1,10 @@
 #pragma once
-
-#include "dbusConnectionManager.h"
 #include <string>
 #include <list>
+
+#include "dbusConnectionManager.h"
+#include "NetworkManagerGnomeUtils.h"
+
 
 class NetworkManagerClient {
 public:
@@ -10,7 +12,8 @@ public:
     ~NetworkManagerClient();
 
     bool getKnownSSIDs(std::list<std::string>& ssids);
-
+    bool getavilableSSID(std::list<std::string>& ssids);
+    bool getConnectedSSID();
 private:
     DbusConnectionManager dbusConnection;
 };
