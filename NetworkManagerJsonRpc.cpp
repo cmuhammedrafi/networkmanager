@@ -302,13 +302,7 @@ namespace WPEFramework
                 interface = m_primaryInterfaceCache.getValue();
             }
 
-            if ("wlan0" == interface && m_wifiStateCache.isSet() && m_wifiStateCache.getValue() != Exchange::INetworkManager::WIFI_STATE_CONNECTED)
-            {
-                NMLOG_WARNING("WiFi not connected (%d); no IP address available", m_wifiStateCache.getValue());
-                isCacheLoaded = true; // to load empty strings in the replay
-                rc = Core::ERROR_NONE;
-            }
-            else if(m_primaryInterfaceCache.isSet() && (interface == m_primaryInterfaceCache.getValue()))
+            if(m_primaryInterfaceCache.isSet() && (interface == m_primaryInterfaceCache.getValue()))
             {
                 /* If ipversion is empty, IPv4 will be taken as the default version */
                 if(m_ipv4AddressCache.isSet() && (ipversion.empty() || strcasecmp(ipversion.c_str(), "IPv4") == 0))
