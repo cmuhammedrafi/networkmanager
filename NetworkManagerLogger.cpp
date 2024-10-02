@@ -54,6 +54,9 @@ namespace NetworkManagerLogger {
 
     void logPrint(LogLevel level, const char* file, const char* func, int line, const char* format, ...)
     {
+        if (gDefaultLogLevel < level)
+            return;
+
         size_t n = 0;
         const short kFormatMessageSize = 1024;
         char formattedLog[kFormatMessageSize] = {0};
@@ -72,14 +75,16 @@ namespace NetworkManagerLogger {
         }
         formattedLog[kFormatMessageSize - 1] = '\0';
 #ifdef USE_RDK_LOGGER
-        RDK_LOG((int)level, "LOG.RDK.NETSRVMGER", "%s\n", formattedLog);
+        if(level == INFO_LEVEL) // rdk_LogLevel =>  RDK_LOG_NOTICE=3 RDK_LOG_INFO=4 RDK_LOG_DEBUG= 5
+            level = (LogLevel)RDK_LOG_INFO;
+        else if(level > INFO_LEVEL)
+            level = (LogLevel)RDK_LOG_DEBUG;
+
+        RDK_LOG((rdk_LogLevel)level, "LOG.RDK.NETSRVMGR", " %s:%d %s\n", basename(file), line, formattedLog);
 #else
         const char* levelMap[] = {"Fatal", "Error", "Warning", "Info", "Verbose", "Trace"};
         struct timeval tv;
         struct tm* lt;
-
-        if (gDefaultLogLevel < level)
-            return;
 
         gettimeofday(&tv, NULL);
         lt = localtime(&tv.tv_sec);
