@@ -6,11 +6,12 @@ set(CMAKE_CXX_STANDARD 11)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GLIB REQUIRED glib-2.0)
 pkg_check_modules(GIO REQUIRED gio-2.0)
+pkg_check_modules(LIBNM REQUIRED libnm)
 
 include_directories(
-    ${GLIB_INCLUDE_DIRS}
-    ${GIO_INCLUDE_DIRS}
-    /usr/include/NetworkManager/libnm
+    ${GLIB_INCLUDE_DIRS} 
+    ${GIO_INCLUDE_DIRS} 
+    ${LIBNM_INCLUDE_DIRS}
 )
 
 # Force the compiler to include utils.h automatically

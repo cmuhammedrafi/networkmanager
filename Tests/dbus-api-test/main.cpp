@@ -22,7 +22,8 @@ int main() {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     
         nmClient.getConnectedSSID();
-        nmClient.getavilableSSID(ssids);
+        std::string ssid = "Mi11Lite";
+        nmClient.startWifiScanning(ssid);
     }
     NMLOG_INFO("Program completed successfully");
     return 0;

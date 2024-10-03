@@ -72,21 +72,23 @@ static void fetssidandbssid(GVariant *setting80211, std::string &ssid, std::stri
     g_variant_unref(value);
 }
 
-static bool fetchSSIDFromConnection(const char *path, std::list<std::string>& ssids)
+static bool fetchSSIDFromConnection(GDBusConnection *dbusConn, const std::string& path, std::list<std::string>& ssids)
 {
     GError *error = NULL;
     GDBusProxy *ConnProxy = NULL;
     GVariant *settingsProxy= NULL, *connection= NULL, *sCon= NULL;
     bool isFound;
     const char *connId= NULL, *connTyp= NULL, *iface= NULL;
-    ConnProxy = g_dbus_proxy_new_for_bus_sync(G_BUS_TYPE_SYSTEM,
-                                    G_DBUS_PROXY_FLAGS_NONE,
-                                    NULL,
-                                    "org.freedesktop.NetworkManager",
-                                    path,
-                                    "org.freedesktop.NetworkManager.Settings.Connection",
-                                    NULL,
-                                    &error);
+
+    ConnProxy = g_dbus_proxy_new_sync(dbusConn,
+                        G_DBUS_PROXY_FLAGS_NONE,
+                        NULL,
+                        "org.freedesktop.NetworkManager",
+                        path.c_str(),
+                        "org.freedesktop.NetworkManager.Settings.Connection",
+                        NULL,
+                        &error);
+
     if (error != NULL) {
         NMLOG_ERROR("Failed to create proxy: %s", error->message);
         g_error_free(error);
@@ -135,82 +137,19 @@ static bool fetchSSIDFromConnection(const char *path, std::list<std::string>& ss
     return true;
 }
 
-static bool fetchConnectionPaths(GDBusProxy *proxy, std::list<std::string>& pathsList)
-{
-    GVariant *listProxy = NULL;
-    GError *error = NULL;
-    char **paths = NULL;
-    listProxy = g_dbus_proxy_call_sync(proxy,
-                                 "ListConnections",
-                                 NULL,
-                                 G_DBUS_CALL_FLAGS_NONE,
-                                 -1,
-                                 NULL,
-                                 &error);
-    if(listProxy == NULL)
-    {
-        if (!error) {
-            NMLOG_ERROR("ListConnections failed: %s", error->message);
-            g_error_free(error);
-            return false;
-        }
-        else
-            NMLOG_ERROR("ListConnections proxy failed no error message");
-    }
-
-    g_variant_get(listProxy, "(^ao)", &paths);
-    g_variant_unref(listProxy);
-
-    if(paths == NULL)
-    {
-        NMLOG_WARNING("no connection path available");
-        return false;
-    }
-
-    for (int i = 0; paths[i]; i++) {
-        NMLOG_VERBOSE("Connection path: %s", paths[i]);
-        pathsList.push_back(paths[i]);
-    }
-
-    if(pathsList.empty())
-        return false;
-
-    return true;
-}
-
 bool NetworkManagerClient::getKnownSSIDs(std::list<std::string>& ssids)
 {
-    GDBusProxy *sProxy= NULL;
-    GError *error= NULL;
     std::list<std::string> paths;
-
-    sProxy = g_dbus_proxy_new_sync(dbusConnection.getConnection(),
-                              G_DBUS_PROXY_FLAGS_NONE,
-                              NULL,
-                              "org.freedesktop.NetworkManager",
-                              "/org/freedesktop/NetworkManager/Settings",
-                              "org.freedesktop.NetworkManager.Settings",
-                              NULL, // GCancellable
-                              &error);
-
-    if(sProxy == NULL)
+    if(!GnomeUtils::getConnectionPaths(dbusConnection.getConnection(), paths))
     {
-        if (error != NULL) {
-            NMLOG_ERROR("Failed to create proxy: %s", error->message);
-            g_error_free(error);
-        }
+        NMLOG_ERROR("Connection path fetch failed");
         return false;
     }
 
-    if(fetchConnectionPaths(sProxy, paths))
-    {
-        for (const std::string& path : paths) {
-            NMLOG_VERBOSE("connection path %s", path.c_str());
-            fetchSSIDFromConnection(path.c_str(), ssids);
-        }
+    for (const std::string& path : paths) {
+        NMLOG_VERBOSE("connection path %s", path.c_str());
+        fetchSSIDFromConnection(dbusConnection.getConnection(), path, ssids);
     }
-
-    g_object_unref(sProxy);
 
     if(ssids.empty())
          return false;
@@ -220,14 +159,67 @@ bool NetworkManagerClient::getKnownSSIDs(std::list<std::string>& ssids)
 bool NetworkManagerClient::getConnectedSSID()
 {
     std::string wifiDevicePath;
+    GError* error = NULL;
+    GDBusProxy* wProxy = NULL;
+    GVariant* result = NULL;
+    gchar *activeApPath = NULL;
+    bool ret = false;
+    NMDeviceState state;
+
+    if(GnomeUtils::getDeviceState(dbusConnection.getConnection(), "wlan0", state) && state < NM_DEVICE_STATE_DISCONNECTED)
+    {
+        NMDeviceStateReason StateReason;
+        GnomeUtils::getDeviceStateReason(dbusConnection.getConnection(), "wlan0", StateReason);
+        NMLOG_ERROR("wifi device state is invallied");
+        return false;
+    }
+
     if(!GnomeUtils::getDeviceByIpIface(dbusConnection.getConnection(),"wlan0", wifiDevicePath))
     {
         NMLOG_ERROR("no wifi device found");
         return false;
     }
-    NMLOG_TRACE("wifi device path %s", wifiDevicePath.c_str());
+
     //TODO check active connection path and return properties
-    return true;
+    wProxy = g_dbus_proxy_new_sync(dbusConnection.getConnection(),
+                            G_DBUS_PROXY_FLAGS_NONE,
+                            NULL,
+                            "org.freedesktop.NetworkManager",
+                            wifiDevicePath.c_str(),
+                            "org.freedesktop.NetworkManager.Device.Wireless",
+                            NULL, // GCancellable
+                            &error);
+
+    if (error) {
+        NMLOG_ERROR("Error creating proxy: %s", error->message);
+        g_error_free(error);
+        return false;
+    }
+
+    result = g_dbus_proxy_get_cached_property(wProxy, "ActiveAccessPoint");
+    if (!result) {
+        NMLOG_ERROR("Failed to get ActiveAccessPoint property.");
+        g_object_unref(wProxy);
+        return false;
+    }
+
+    g_variant_get(result, "o", &activeApPath);
+    if(g_strdup(activeApPath) != NULL && g_strcmp0(activeApPath, "/") != 0)
+    {
+        NMLOG_TRACE("ActiveAccessPoint property path %s", activeApPath);
+        apProperties apDetails;
+        if(GnomeUtils::getApDetails(dbusConnection.getConnection(), g_strdup(activeApPath), apDetails))
+        {
+            NMLOG_INFO("getApDetails success");
+            ret = true;
+        }
+    }
+    else
+        NMLOG_ERROR("active access point not found");
+
+    g_variant_unref(result);
+    g_object_unref(wProxy);
+    return ret;
 }
 
 bool NetworkManagerClient::getavilableSSID(std::list<std::string>& ssids)
@@ -242,7 +234,6 @@ bool NetworkManagerClient::getavilableSSID(std::list<std::string>& ssids)
         NMLOG_ERROR("no wifi device found");
         return false;
     }
-    NMLOG_TRACE("wifi device path %s", wifiDevicePath.c_str());
 
     wProxy = g_dbus_proxy_new_sync(dbusConnection.getConnection(),
                             G_DBUS_PROXY_FLAGS_NONE,
@@ -250,7 +241,7 @@ bool NetworkManagerClient::getavilableSSID(std::list<std::string>& ssids)
                             "org.freedesktop.NetworkManager",
                             wifiDevicePath.c_str(),
                             "org.freedesktop.NetworkManager.Device.Wireless",
-                            NULL, // GCancellable
+                            NULL,
                             &error);
 
     if (error) {
@@ -288,3 +279,57 @@ bool NetworkManagerClient::getavilableSSID(std::list<std::string>& ssids)
     return true;
 }
 
+bool NetworkManagerClient::startWifiScanning(const std::string& ssid)
+{
+    GError* error = NULL;
+    GDBusProxy* wProxy = NULL;
+    std::string wifiDevicePath;
+    if(!GnomeUtils::getDeviceByIpIface(dbusConnection.getConnection(),"wlan0", wifiDevicePath))
+    {
+        NMLOG_ERROR("no wifi device found");
+        return false;
+    }
+
+    wProxy = g_dbus_proxy_new_sync(dbusConnection.getConnection(),
+                        G_DBUS_PROXY_FLAGS_NONE,
+                        NULL,
+                        "org.freedesktop.NetworkManager",
+                        wifiDevicePath.c_str(),
+                        "org.freedesktop.NetworkManager.Device.Wireless",
+                        NULL,
+                        &error);
+
+    if (error) {
+        NMLOG_ERROR("Error creating proxy: %s", error->message);
+        g_error_free(error);
+        return false;
+    }
+
+    GVariant *options = NULL;
+    if (!ssid.empty()) {
+        NMLOG_INFO("staring wifi scanning .. %s", ssid.c_str());
+        GVariantBuilder builder, array_builder;
+        g_variant_builder_init(&builder, G_VARIANT_TYPE_VARDICT);
+        g_variant_builder_init(&array_builder, G_VARIANT_TYPE("aay"));
+        g_variant_builder_add(&array_builder, "@ay",
+                            g_variant_new_fixed_array(G_VARIANT_TYPE_BYTE, (const guint8 *) ssidReq.c_str(), ssidReq.length(), 1)
+                            );
+        g_variant_builder_add(&builder, "{sv}", "ssids", g_variant_builder_end(&array_builder));
+        g_variant_builder_add(&builder, "{sv}", "hidden", g_variant_new_boolean(TRUE));
+        options = g_variant_builder_end(&builder);
+    }
+
+    g_dbus_proxy_call_sync(wProxy, "RequestScan", g_variant_new("(a{sv})", options), G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+    if (error) {
+        NMLOG_ERROR("Error RequestScan: %s", error->message);
+        g_error_free(error);
+        g_object_unref(wProxy);
+        return false;
+    }
+
+    if(options)
+        g_variant_unref(options);
+    g_object_unref(wProxy);
+
+     return true;
+ }

@@ -20,8 +20,16 @@
 #pragma once
 #include <gio/gio.h>
 #include <iostream>
-
+#include <string>
+#include <list>
 #include <cstdio>
+#include <uuid/uuid.h>
+#include <gio/gio.h>
+#include <uuid/uuid.h>
+
+/* include NetworkManager.h for the defines, but we don't link against libnm. */
+//#include <NetworkManager.h>
+#include <nm-dbus-interface.h>
 
 struct apProperties
 {
@@ -40,6 +48,9 @@ class GnomeUtils
     public:
         static bool getDeviceByIpIface(GDBusConnection *connection, const gchar *iface_name, std::string& path);
         static bool getApDetails(GDBusConnection *connection, const char* apPath, apProperties& apDetails);
+        static bool getConnectionPaths(GDBusConnection *dbusConn, std::list<std::string>& pathsList);
+        static bool getDeviceState(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceState& state);
+        static bool getDeviceStateReason(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceStateReason& StateReason);
 };
 
 
