@@ -30,7 +30,7 @@
 #include <sys/time.h>
 
 #ifdef USE_RDK_LOGGER
-#include "rdk_debug.h"
+#include "rdk_debug.h";
 #endif
 
 namespace NetworkManagerLogger {
