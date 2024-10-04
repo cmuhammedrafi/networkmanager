@@ -98,7 +98,7 @@ if(ENABLE_GNOME_NETWORKMANAGER)
                                 GnomeProxy/NetworkManagerGnomeUtils.cpp
                                 GnomeProxy/NetworkManagerGnomeClient.cpp
                                 )
-    target_include_directories(${MODULE_NAME} PRIVATE ${GLIB_INCLUDE_DIRS} ${LIBNM_INCLUDE_DIRS})
+    target_include_directories(${MODULE_NAME} PRIVATE ${GLIB_INCLUDE_DIRS} ${LIBNM_INCLUDE_DIRS} GnomeProxy)
     target_link_libraries(${MODULE_NAME} PRIVATE ${GLIB_LIBRARIES} ${GIO_LIBRARIES})
 else()
     target_sources(${MODULE_NAME} PRIVATE NetworkManagerRDKProxy.cpp)

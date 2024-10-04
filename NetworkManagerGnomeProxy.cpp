@@ -1,4 +1,5 @@
 #include "NetworkManagerImplementation.h"
+#include "NetworkManagerGnomeClient.h"
 
 using namespace WPEFramework;
 using namespace WPEFramework::Plugin;
@@ -9,6 +10,7 @@ namespace WPEFramework
     namespace Plugin
     {
         NetworkManagerImplementation* _instance = nullptr;
+        NetworkManagerClient* gnomeClient = nullptr;
         void NetworkManagerInternalEventHandler(const char *owner, int eventId, void *data, size_t len)
         {
             return;
@@ -17,6 +19,7 @@ namespace WPEFramework
         void NetworkManagerImplementation::platform_init()
         {
             ::_instance = this;
+            gnomeClient = NetworkManagerClient::getInstance();
         }
 
         uint32_t NetworkManagerImplementation::GetAvailableInterfaces (Exchange::INetworkManager::IInterfaceDetailsIterator*& interfacesItr/* @out */)
@@ -66,7 +69,22 @@ namespace WPEFramework
 
         uint32_t NetworkManagerImplementation::GetKnownSSIDs(IStringIterator*& ssids /* @out */)
         {
-            return Core::ERROR_NONE;
+            uint32_t rc = Core::ERROR_RPC_CALL_FAILED;
+            std::list<string> ssidList;
+            if(gnomeClient->getKnownSSIDs(ssidList))
+            {
+                if (!ssidList.empty())
+                {
+                    ssids = Core::Service<RPC::StringIterator>::Create<RPC::IStringIterator>(ssidList);
+                    rc = Core::ERROR_NONE;
+                }
+                else
+                {
+                    NMLOG_ERROR("know ssids not found !");
+                    rc = Core::ERROR_GENERAL;
+                }
+            }
+            return rc;
         }
 
         uint32_t NetworkManagerImplementation::AddToKnownSSIDs(const WiFiConnectTo& ssid /* @in */)
