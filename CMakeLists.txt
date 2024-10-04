@@ -35,6 +35,7 @@ set(PLUGIN_LEGACY_WIFI_STARTUPORDER "56" CACHE STRING "To configure startup orde
 
 if(ENABLE_GNOME_NETWORKMANAGER)
 pkg_check_modules(GLIB REQUIRED glib-2.0)
+pkg_check_modules(GIO REQUIRED gio-2.0)
 pkg_check_modules(LIBNM REQUIRED libnm)
 else()
 find_package(IARMBus REQUIRED)
@@ -97,6 +98,7 @@ if(ENABLE_GNOME_NETWORKMANAGER)
     target_sources(${MODULE_NAME} PRIVATE NetworkManagerGnomeProxy.cpp 
                                 GnomeProxy/NetworkManagerGnomeUtils.cpp
                                 GnomeProxy/NetworkManagerGnomeClient.cpp
+                                GnomeProxy/NetworkManagerDbusMgr.cpp
                                 )
     target_include_directories(${MODULE_NAME} PRIVATE ${GLIB_INCLUDE_DIRS} ${LIBNM_INCLUDE_DIRS} GnomeProxy)
     target_link_libraries(${MODULE_NAME} PRIVATE ${GLIB_LIBRARIES} ${GIO_LIBRARIES})
@@ -145,6 +147,6 @@ set_target_properties(${PLUGIN_LEGACY_DEPRECATED_WIFI} PROPERTIES
 install(TARGETS ${PLUGIN_LEGACY_DEPRECATED_WIFI} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/${STORAGE_DIRECTORY}/plugins)
 
 write_config()
-write_config(PLUGINS LegacyPlugin_NetworkAPIs CLASSNAME Network LOCATOR lib${PLUGIN_LEGACY_DEPRECATED_NETWORK}.so)
-write_config(PLUGINS LegacyPlugin_WiFiManagerAPIs CLASSNAME WiFiManager LOCATOR lib${PLUGIN_LEGACY_DEPRECATED_WIFI}.so)
+# write_config(PLUGINS LegacyPlugin_NetworkAPIs CLASSNAME Network LOCATOR lib${PLUGIN_LEGACY_DEPRECATED_NETWORK}.so)
+# write_config(PLUGINS LegacyPlugin_WiFiManagerAPIs CLASSNAME WiFiManager LOCATOR lib${PLUGIN_LEGACY_DEPRECATED_WIFI}.so)
 
