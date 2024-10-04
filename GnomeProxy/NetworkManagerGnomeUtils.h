@@ -1,4 +1,4 @@
-        /*
+/*
  * If not stated otherwise in this file or this component's LICENSE file the
  * following copyright and licenses apply:
  *
@@ -22,13 +22,9 @@
 #include <iostream>
 #include <string>
 #include <list>
-#include <cstdio>
-#include <uuid/uuid.h>
-#include <gio/gio.h>
-#include <uuid/uuid.h>
 
 /* include NetworkManager.h for the defines, but we don't link against libnm. */
-//#include <NetworkManager.h>
+// #include <NetworkManager.h>
 #include <nm-dbus-interface.h>
 
 struct apProperties
@@ -43,16 +39,22 @@ struct apProperties
     uint8_t strength;
 };
 
-class GnomeUtils
+namespace WPEFramework
 {
-    public:
-        static bool getDeviceByIpIface(GDBusConnection *connection, const gchar *iface_name, std::string& path);
-        static bool getApDetails(GDBusConnection *connection, const char* apPath, apProperties& apDetails);
-        static bool getConnectionPaths(GDBusConnection *dbusConn, std::list<std::string>& pathsList);
-        static bool getDeviceState(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceState& state);
-        static bool getDeviceStateReason(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceStateReason& StateReason);
-};
+    namespace Plugin
+    {
+        class GnomeUtils {
+            public:
+                static void printKeyVariant(const char *setting_name, GVariant *setting);
+                static bool getDeviceByIpIface(GDBusConnection *dbusConn, const gchar *iface_name, std::string& path);
+                static bool getApDetails(GDBusConnection *dbusConn, const char* apPath, apProperties& apDetails);
+                static bool getConnectionPaths(GDBusConnection *dbusConn, std::list<std::string>& pathsList);
+                static bool getDeviceState(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceState& state);
+                static bool getDeviceStateReason(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceStateReason& StateReason);
+        };
 
+    } // Plugin
+} // WPEFramework
 
 #define G_VARIANT_LOOKUP(dict, key, format, ...)            \
     if (!g_variant_lookup(dict, key, format, __VA_ARGS__)) {\
