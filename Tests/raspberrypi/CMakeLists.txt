@@ -30,4 +30,5 @@ target_link_libraries(
     NmDbusClient 
     ${GLIB_LIBRARIES}
     ${GIO_LIBRARIES}
+    uuid # TODO remove
 )

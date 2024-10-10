@@ -23,9 +23,12 @@ int main() {
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     
-        nmClient->getConnectedSSID();
-        //std::string ssid = "Mi11Lite";
-        //nmClient->startWifiScanning(ssid);
+        //nmClient->getConnectedSSID();
+       // nmClient->getAvailableSSIDs(ssids);
+        std::string ssid = "Mr13";
+        std::string psk ="123454321";
+        nmClient->startWifiScanning();
+        nmClient->wifiConnect(ssid, psk);
     }
     NMLOG_INFO("Program completed successfully");
     return 0;

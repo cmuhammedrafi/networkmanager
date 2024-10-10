@@ -21,8 +21,9 @@
 #include <gio/gio.h>
 #include <string>
 #include <list>
-#include <nm-dbus-interface.h>
-
+#include <uuid/uuid.h>
+#include <NetworkManager.h>
+#include <libnm/NetworkManager.h>
 #include "NetworkManagerLogger.h"
 #include "NetworkManagerGnomeClient.h"
 #include "NetworkManagerGnomeUtils.h"
@@ -160,7 +161,7 @@ namespace WPEFramework
             }
 
             for (const std::string& path : paths) {
-                NMLOG_VERBOSE("connection path %s", path.c_str());
+               // NMLOG_VERBOSE("connection path %s", path.c_str());
                 fetchSSIDFromConnection(dbusConnection.getConnection(), path, ssids);
             }
 
@@ -192,7 +193,6 @@ namespace WPEFramework
                 NMLOG_ERROR("wifi device state is invallied");
                 return false;
             }
-
 
             //TODO check active connection path and return properties
             wProxy = g_dbus_proxy_new_sync(dbusConnection.getConnection(),
@@ -302,7 +302,7 @@ namespace WPEFramework
             return true;
         }
 
-        bool NetworkManagerClient::startWifiScanning(const std::string& ssid)
+        bool NetworkManagerClient::startWifiScanning(const std::string ssid)
         {
             GError* error = NULL;
             GDBusProxy* wProxy = NULL;
@@ -328,21 +328,46 @@ namespace WPEFramework
                 return false;
             }
 
-            GVariant *options = NULL;
-            if (!ssid.empty()) {
-                NMLOG_INFO("staring wifi scanning .. %s", ssid.c_str());
-                GVariantBuilder builder, array_builder;
-                g_variant_builder_init(&builder, G_VARIANT_TYPE_VARDICT);
-                g_variant_builder_init(&array_builder, G_VARIANT_TYPE("aay"));
-                g_variant_builder_add(&array_builder, "@ay",
-                                    g_variant_new_fixed_array(G_VARIANT_TYPE_BYTE, (const guint8 *) ssid.c_str(), ssid.length(), 1)
-                                    );
-                g_variant_builder_add(&builder, "{sv}", "ssids", g_variant_builder_end(&array_builder));
-                g_variant_builder_add(&builder, "{sv}", "hidden", g_variant_new_boolean(TRUE));
-                options = g_variant_builder_end(&builder);
+            GVariant* timestampVariant = NULL;
+            timestampVariant = g_dbus_proxy_get_cached_property(wProxy, "LastScan");
+            if (!timestampVariant) {
+                NMLOG_ERROR("Failed to get LastScan properties");
+                g_object_unref(wProxy);
+                return false;
             }
 
-            g_dbus_proxy_call_sync(wProxy, "RequestScan", g_variant_new("(a{sv})", options), G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+            if (g_variant_is_of_type (timestampVariant, G_VARIANT_TYPE_INT64)) {
+                gint64 timestamp;
+                timestamp = g_variant_get_int64 (timestampVariant);
+                NMLOG_TRACE("Last scan timestamp: %lld", timestamp);
+            } else {
+                g_warning("Unexpected variant type: %s", g_variant_get_type_string (timestampVariant));
+            }
+
+            GVariant *options = NULL;
+            if (!ssid.empty()) 
+            {
+                // TODO fix specific ssid scanning
+                NMLOG_INFO("staring wifi scanning .. %s", ssid.c_str());
+                GVariantBuilder settingsBuilder;
+                g_variant_builder_init (&settingsBuilder, G_VARIANT_TYPE ("a{sv}"));
+                GVariant *ssid_array = g_variant_new_fixed_array(G_VARIANT_TYPE_BYTE, (const guint8 *)ssid.c_str(), ssid.length(), 1);
+                g_variant_builder_add (&settingsBuilder, "{sv}", "ssids", ssid_array);
+
+                // GVariantBuilder builder, array_builder;
+                // g_variant_builder_init(&builder, G_VARIANT_TYPE_VARDICT);
+                // g_variant_builder_init(&array_builder, G_VARIANT_TYPE("aay"));
+                // g_variant_builder_add(&array_builder, "@ay",
+                //                     g_variant_new_fixed_array(G_VARIANT_TYPE_BYTE, (const guint8 *) ssid.c_str(), ssid.length(), 1)
+                //                     );
+                // g_variant_builder_add(&builder, "{sv}", "ssids", g_variant_builder_end(&array_builder));
+                // g_variant_builder_add(&builder, "{sv}", "hidden", g_variant_new_boolean(TRUE));
+
+                options = g_variant_builder_end(&settingsBuilder);
+                g_dbus_proxy_call_sync(wProxy, "RequestScan", options, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+            }
+            else
+                g_dbus_proxy_call_sync(wProxy, "RequestScan",   g_variant_new("(a{sv})", options), G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
             if (error) {
                 NMLOG_ERROR("Error RequestScan: %s", error->message);
                 g_error_free(error);
@@ -353,6 +378,300 @@ namespace WPEFramework
             if(options)
                 g_variant_unref(options);
             g_object_unref(wProxy);
+
+            return true;
+        }
+
+        static char * nm_utils_uuid_generate (void)
+        {
+            uuid_t uuid;
+            char *buf;
+
+            buf = static_cast<char*>(g_malloc0(37));
+            uuid_generate_random (uuid);
+            uuid_unparse_lower (uuid, &buf[0]);
+            return buf;
+        }
+
+        bool activateConnection(GDBusConnection *dbusConn, GVariantBuilder connBuilder, const char* devicePath, bool persist)
+        {
+            GDBusProxy* proxy = nullptr;
+            GError* error = nullptr;
+            GVariant* result = nullptr;
+
+            // Define the D-Bus service, object path, and interface
+            const char* service = "org.freedesktop.NetworkManager";
+            const char* objectPath = "/org/freedesktop/NetworkManager";
+            const char* interface = "org.freedesktop.NetworkManager";
+        
+            proxy = g_dbus_proxy_new_sync(dbusConn, G_DBUS_PROXY_FLAGS_NONE, NULL, service, objectPath, interface, NULL, &error);
+
+            if (error) {
+                std::cerr << "Failed to create proxy: " << error->message << std::endl;
+                g_clear_error(&error);
+                return false;
+            }
+
+            const char* specific_object = "/";
+
+            GVariantBuilder optionsBuilder;
+            g_variant_builder_init (&optionsBuilder, G_VARIANT_TYPE ("a{sv}"));
+            if(persist)
+                g_variant_builder_add(&optionsBuilder, "{sv}", "persist", g_variant_new_string("disk"));
+            else
+                g_variant_builder_add(&optionsBuilder, "{sv}", "persist", g_variant_new_string("volatile"));
+
+            // Call AddAndActivateConnection2
+            result = g_dbus_proxy_call_sync (proxy, "AddAndActivateConnection2",
+                g_variant_new("(a{sa{sv}}ooa{sv})", connBuilder, devicePath, specific_object, optionsBuilder),
+                G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
+
+            if (error) {
+                std::cerr << "Failed to call AddAndActivateConnection2: " << error->message << std::endl;
+                g_clear_error(&error);
+                g_object_unref(proxy);
+                return false;
+            }
+
+            GVariant* pathVariant;
+            GVariant* activeConnVariant;
+            GVariant* resultDict;
+
+            g_variant_get(result, "(@o@o@a{sv})", &pathVariant, &activeConnVariant, &resultDict);
+
+            // Extract connection and active connection paths
+            const char* newConnPath = g_variant_get_string(pathVariant, nullptr);
+            const char* activeConnPath = g_variant_get_string(activeConnVariant, nullptr);
+
+            NMLOG_TRACE("newconn %s; activeconn %s",newConnPath, activeConnPath);
+            g_variant_unref(pathVariant);
+            g_variant_unref(activeConnVariant);
+            g_variant_unref(resultDict);
+            g_variant_unref(result);
+            g_object_unref(proxy);
+        
+            return true;
+        }
+
+        static bool gVariantConnectionBuilder(std::string ssid, std::string password, GVariantBuilder& connBuilder)
+        {
+            char *uuid = NULL;
+            GVariantBuilder settingsBuilder;
+            /* Build up the complete connection */
+            g_variant_builder_init (&connBuilder, G_VARIANT_TYPE ("a{sa{sv}}"));
+
+            /* Build up the 'connection' Setting */
+            g_variant_builder_init (&settingsBuilder, G_VARIANT_TYPE ("a{sv}"));
+
+            uuid = nm_utils_uuid_generate ();
+            g_variant_builder_add (&settingsBuilder, "{sv}",
+                                NM_SETTING_CONNECTION_UUID,
+                                g_variant_new_string (uuid));
+            g_free (uuid);
+
+            g_variant_builder_add (&settingsBuilder, "{sv}",
+                                NM_SETTING_CONNECTION_ID,
+                                g_variant_new_string (ssid.c_str()));
+            g_variant_builder_add (&settingsBuilder, "{sv}",
+                                NM_SETTING_CONNECTION_TYPE,
+                                g_variant_new_string (NM_SETTING_WIRELESS_SETTING_NAME));
+
+            g_variant_builder_add (&connBuilder, "{sa{sv}}",
+                                NM_SETTING_CONNECTION_SETTING_NAME,
+                                &settingsBuilder);
+
+            /* Add the '802-11-wireless' Setting */
+            g_variant_builder_init (&settingsBuilder, G_VARIANT_TYPE ("a{sv}"));
+            GVariant *ssid_array = g_variant_new_fixed_array(G_VARIANT_TYPE_BYTE, (const guint8 *)ssid.c_str(), ssid.length(), 1);
+            g_variant_builder_add (&settingsBuilder, "{sv}",
+                                NM_SETTING_WIRELESS_SSID,
+                                ssid_array);
+
+            g_variant_builder_add (&settingsBuilder, "{sv}",
+                                NM_SETTING_WIRELESS_MODE,
+                                g_variant_new_string(NM_SETTING_WIRELESS_MODE_INFRA));
+
+            g_variant_builder_add (&settingsBuilder, "{sv}",
+                                NM_SETTING_WIRELESS_HIDDEN,
+                                g_variant_new_boolean(true)); // set hidden: yes
+
+            g_variant_builder_add (&connBuilder, "{sa{sv}}",
+                                NM_SETTING_WIRELESS_SETTING_NAME,
+                                &settingsBuilder);
+
+            if(!password.empty())
+            {
+                /* Build up the '802-11-wireless-security' settings */
+                g_variant_builder_init (&settingsBuilder, G_VARIANT_TYPE ("a{sv}"));
+
+                g_variant_builder_add (&settingsBuilder, "{sv}",
+                                    NM_SETTING_WIRELESS_SECURITY_KEY_MGMT,
+                                    g_variant_new_string("wpa-psk"));
+
+                g_variant_builder_add (&settingsBuilder, "{sv}",
+                        NM_SETTING_WIRELESS_SECURITY_PSK,
+                        g_variant_new_string(password.c_str()));
+
+                g_variant_builder_add (&connBuilder, "{sa{sv}}",
+                        NM_SETTING_WIRELESS_SECURITY_SETTING_NAME,
+                        &settingsBuilder);
+            }
+
+            /* Build up the 'ipv4' Setting */
+            g_variant_builder_init (&settingsBuilder, G_VARIANT_TYPE ("a{sv}"));
+            g_variant_builder_add (&settingsBuilder, "{sv}",
+                                NM_SETTING_IP_CONFIG_METHOD,
+                                g_variant_new_string (NM_SETTING_IP4_CONFIG_METHOD_AUTO));
+
+            g_variant_builder_add (&connBuilder, "{sa{sv}}",
+                                NM_SETTING_IP4_CONFIG_SETTING_NAME,
+                                &settingsBuilder);
+
+            /* Build up the 'ipv6' Setting */
+            g_variant_builder_init (&settingsBuilder, G_VARIANT_TYPE ("a{sv}"));
+            g_variant_builder_add (&settingsBuilder, "{sv}",
+                                NM_SETTING_IP_CONFIG_METHOD,
+                                g_variant_new_string (NM_SETTING_IP6_CONFIG_METHOD_AUTO));
+
+            g_variant_builder_add (&connBuilder, "{sa{sv}}",
+                                NM_SETTING_IP6_CONFIG_SETTING_NAME,
+                                &settingsBuilder);
+            return true;
+        }
+
+        bool NetworkManagerClient::addToKnownSSIDs(const Exchange::INetworkManager::WiFiConnectTo& ssidinfo)
+        {
+            GVariantBuilder connBuilder;
+            bool ret = false;
+            GVariant *result = NULL;
+            GError* error = nullptr;
+            const char *newConPath = NULL;
+
+            if(ssidinfo.m_ssid.empty())
+            {
+                NMLOG_WARNING("ssid name is missing");
+                return false;
+            }
+
+            switch(ssidinfo.m_securityMode)
+            {
+                case Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK_AES:
+                case Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_WPA2_PSK:
+                case Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK_TKIP:
+                case Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA2_PSK_AES:
+                case Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA2_PSK_TKIP:
+                case Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA3_SAE:
+                {
+                     if(ssidinfo.m_passphrase.empty())
+                     {
+                          NMLOG_WARNING("wifi securtity type need password");
+                          return false;
+                     }
+
+                    ret = gVariantConnectionBuilder(ssidinfo.m_ssid, ssidinfo.m_passphrase, connBuilder);
+                    break;
+                }
+                case Exchange::INetworkManager::WIFI_SECURITY_NONE:
+                     NMLOG_INFO("open wifi network configuration");
+                    ret= gVariantConnectionBuilder(ssidinfo.m_ssid, ssidinfo.m_passphrase, connBuilder);
+                     break;
+                default:
+                {
+                    NMLOG_WARNING("connection wifi securtity type not supported");
+                    return false;
+                }
+            }
+
+            if(!ret) {
+              NMLOG_WARNING("connection builder failed");
+              return false;
+            }
+
+            GDBusProxy *proxy = NULL;
+            proxy = g_dbus_proxy_new_sync(dbusConnection.getConnection(),
+                                G_DBUS_PROXY_FLAGS_NONE,
+                                NULL,
+                                "org.freedesktop.NetworkManager",
+                                "/org/freedesktop/NetworkManager/Settings",
+                                "org.freedesktop.NetworkManager.Settings",
+                                NULL,
+                                &error);
+                                
+            result = g_dbus_proxy_call_sync (proxy,
+                                        "AddConnection",
+                                        g_variant_new ("(a{sa{sv}})", &connBuilder),
+                                        G_DBUS_CALL_FLAGS_NONE, -1,
+                                        NULL, &error);
+
+            if (!proxy) {
+                g_dbus_error_strip_remote_error (error);
+                NMLOG_ERROR ("Could not create NetworkManager D-Bus proxy: %s", error->message);
+                g_error_free (error);
+                return false;
+            }
+
+            if (result) {
+                g_variant_get (result, "(&o)", &newConPath);
+                NMLOG_INFO("Added: %s", newConPath);
+                g_variant_unref (result);
+            } else {
+                g_dbus_error_strip_remote_error (error);
+                NMLOG_ERROR("Error adding connection: %s", error->message);
+                g_clear_error (&error);
+            }
+
+            return true;
+        }
+
+        bool NetworkManagerClient::wifiConnect(const Exchange::INetworkManager::WiFiConnectTo& ssidinfo)
+        {
+            GDBusProxy *proxy;
+            GError *error = NULL;
+            GVariantBuilder connBuilder;
+            bool ret = false;
+
+            if(ssidinfo.m_ssid.empty())
+            {
+                NMLOG_WARNING("ssid name is missing");
+                return false;
+            }
+
+            switch(ssidinfo.m_securityMode)
+            {
+                case Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK_AES:
+                case Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_WPA2_PSK:
+                case Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK_TKIP:
+                case Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA2_PSK_AES:
+                case Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA2_PSK_TKIP:
+                case Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA3_SAE:
+                {
+                     if(ssidinfo.m_passphrase.empty())
+                     {
+                          NMLOG_WARNING("wifi securtity type need password");
+                          return false;
+                     }
+                    ret = gVariantConnectionBuilder(ssidinfo.m_ssid, ssidinfo.m_passphrase, connBuilder);
+                    break;
+                }
+                case Exchange::INetworkManager::WIFI_SECURITY_NONE:
+                    NMLOG_INFO("open wifi network configuration");
+                    ret= gVariantConnectionBuilder(ssidinfo.m_ssid, ssidinfo.m_passphrase, connBuilder);
+                    break;
+                default:
+                    NMLOG_WARNING("connection wifi securtity type not supported");
+                    return false;
+            }
+
+            std::string wifiDevicePath;
+            if(!GnomeUtils::getDeviceByIpIface(dbusConnection.getConnection(),"wlan0", wifiDevicePath)) {
+                NMLOG_ERROR("no wifi device found");
+                return false;
+            }
+
+            if(activateConnection(dbusConnection.getConnection(), connBuilder, wifiDevicePath.c_str(), true))
+                NMLOG_INFO("wifi connect request success");
+            else
+              NMLOG_ERROR("wifi connect request Failed");
 
             return true;
         }

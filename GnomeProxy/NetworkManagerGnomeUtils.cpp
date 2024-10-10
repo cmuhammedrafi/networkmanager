@@ -81,13 +81,15 @@ namespace WPEFramework
                 return ret;
             }
 
-            g_variant_get(result, "(o)", &device_path);
-            if(g_strdup(device_path) != NULL)
+            if (g_variant_is_of_type (result, (const GVariantType *) "(o)"))
             {
-                path = std::string(g_strdup(device_path));
-                ret = true;
+                g_variant_get(result, "(o)", &device_path);
+                if(g_strdup(device_path) != NULL)
+                {
+                    path = std::string(g_strdup(device_path));
+                    ret = true;
+                }
             }
-
             //NMLOG_TRACE("%s device path %s", iface_name, path.c_str());
             g_variant_unref(result);
             return ret;
@@ -102,8 +104,10 @@ namespace WPEFramework
                 g_object_unref(proxy);
                 return false;
             }
-            g_variant_get(result, "u", &value);
-            NMLOG_TRACE("%s: %d", propertiy, value);
+            if (g_variant_is_of_type (result, G_VARIANT_TYPE_UINT32)) {
+                value = g_variant_get_uint32 (result);
+                NMLOG_TRACE("%s: %d", propertiy, value);
+            }
             g_variant_unref(result);
             return true;
         }
@@ -234,7 +238,7 @@ namespace WPEFramework
             }
 
             for (int i = 0; paths[i]; i++) {
-                NMLOG_VERBOSE("Connection path: %s", paths[i]);
+                //NMLOG_VERBOSE("Connection path: %s", paths[i]);
                 pathsList.push_back(paths[i]);
             }
 
