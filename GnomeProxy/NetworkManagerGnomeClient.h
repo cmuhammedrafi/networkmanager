@@ -45,7 +45,7 @@ namespace WPEFramework
 
                 bool getKnownSSIDs(std::list<std::string>& ssids);
                 bool getAvailableSSIDs(std::list<std::string>& ssids);
-                bool getConnectedSSID();
+                bool getConnectedSSID(Exchange::INetworkManager::WiFiSSIDInfo &ssidinfo);
                 bool addToKnownSSIDs(const Exchange::INetworkManager::WiFiConnectTo& ssidinfo);
                 bool startWifiScanning(const std::string ssid = "");
                 bool wifiConnect(const Exchange::INetworkManager::WiFiConnectTo& ssidinfo);

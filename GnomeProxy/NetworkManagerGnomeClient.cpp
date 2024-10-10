@@ -170,7 +170,7 @@ namespace WPEFramework
             return true;
         }
 
-        bool NetworkManagerClient::getConnectedSSID()
+        bool NetworkManagerClient::getConnectedSSID(Exchange::INetworkManager::WiFiSSIDInfo &ssidinfo)
         {
             std::string wifiDevicePath;
             GError* error = NULL;
@@ -194,7 +194,6 @@ namespace WPEFramework
                 return false;
             }
 
-            //TODO check active connection path and return properties
             wProxy = g_dbus_proxy_new_sync(dbusConnection.getConnection(),
                                     G_DBUS_PROXY_FLAGS_NONE,
                                     NULL,
