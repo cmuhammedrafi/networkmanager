@@ -93,12 +93,23 @@ set_target_properties(${MODULE_NAME} PROPERTIES
 
 
 if(ENABLE_GNOME_NETWORKMANAGER)
-    target_sources(${MODULE_NAME} PRIVATE NetworkManagerGnomeProxy.cpp 
-                    NetworkManagerGnomeWIFI.cpp
-                    NetworkManagerGnomeEvents.cpp
-                    NetworkManagerGnomeUtils.cpp )
-    target_include_directories(${MODULE_NAME} PRIVATE ${GLIB_INCLUDE_DIRS} ${LIBNM_INCLUDE_DIRS})
-    target_link_libraries(${MODULE_NAME} PRIVATE ${LIBNM_LIBRARIES})
+    if(ENABLE_GNOME_LIBNM_PROXY)
+        target_sources(${MODULE_NAME} PRIVATE 
+            libnm/NetworkManagerGnomeProxy.cpp 
+            libnm/NetworkManagerGnomeWIFI.cpp
+            libnm/NetworkManagerGnomeEvents.cpp
+            libnm/NetworkManagerGnomeUtils.cpp )
+        target_include_directories(${MODULE_NAME} PRIVATE ${GLIB_INCLUDE_DIRS} ${LIBNM_INCLUDE_DIRS})
+        target_link_libraries(${MODULE_NAME} PRIVATE ${LIBNM_LIBRARIES})
+    else()
+        target_sources(${MODULE_NAME} PRIVATE 
+            gdbus/NetworkManagerGnomeProxy.cpp 
+            gdbus/NetworkManagerGdbusClient.cpp
+            gdbus/NetworkManagerGdbusMgr.cpp
+            gdbus/NetworkManagerGdbusUtils.cpp )
+        target_include_directories(${MODULE_NAME} PRIVATE ${GLIB_INCLUDE_DIRS} ${LIBNM_INCLUDE_DIRS} gdbus)
+        target_link_libraries(${MODULE_NAME} PRIVATE ${GLIB_LIBRARIES} ${GIO_LIBRARIES} uuid )
+    endif()
 else()
     target_sources(${MODULE_NAME} PRIVATE NetworkManagerRDKProxy.cpp)
     target_include_directories(${MODULE_NAME} PRIVATE ${IARMBUS_INCLUDE_DIRS})
@@ -157,6 +168,7 @@ set_target_properties(${PLUGIN_LEGACY_DEPRECATED_WIFI} PROPERTIES
 install(TARGETS ${PLUGIN_LEGACY_DEPRECATED_WIFI} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/${STORAGE_DIRECTORY}/plugins)
 
 write_config()
-write_config(PLUGINS LegacyPlugin_NetworkAPIs CLASSNAME Network LOCATOR lib${PLUGIN_LEGACY_DEPRECATED_NETWORK}.so)
-write_config(PLUGINS LegacyPlugin_WiFiManagerAPIs CLASSNAME WiFiManager LOCATOR lib${PLUGIN_LEGACY_DEPRECATED_WIFI}.so)
+# write_config(PLUGINS LegacyPlugin_NetworkAPIs CLASSNAME Network LOCATOR lib${PLUGIN_LEGACY_DEPRECATED_NETWORK}.so)
+# write_config(PLUGINS LegacyPlugin_WiFiManagerAPIs CLASSNAME WiFiManager LOCATOR lib${PLUGIN_LEGACY_DEPRECATED_WIFI}.so)
 
+include(Tests/raspberrypi/NetworkManagerGdbusTest.cmake)
