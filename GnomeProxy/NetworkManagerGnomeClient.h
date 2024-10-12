@@ -45,7 +45,7 @@ namespace WPEFramework
 
                 bool getKnownSSIDs(std::list<std::string>& ssids);
                 bool getAvailableSSIDs(std::list<std::string>& ssids);
-                bool getConnectedSSID(const Exchange::INetworkManager::WiFiSSIDInfo &ssidinfo);
+                bool getConnectedSSID(const Exchange::INetworkManager::WiFiSSIDInfo& ssidinfo);
                 bool addToKnownSSIDs(const Exchange::INetworkManager::WiFiConnectTo& ssidinfo);
                 bool removeKnownSSIDs(const std::string& ssid);
                 bool startWifiScanning(const std::string ssid = "");
@@ -53,7 +53,6 @@ namespace WPEFramework
                 bool wifiDisconnect();
 
             private:
-
                 NetworkManagerClient();
                 ~NetworkManagerClient();
 

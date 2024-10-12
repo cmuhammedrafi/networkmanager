@@ -31,7 +31,18 @@ namespace WPEFramework
     namespace Plugin
     {
         static const char* ifnameEth = "eth0";
-        static const char* ifnameWlan = "wlan0";
+        static const char* ifnameWlan = "wlp0s20f3";
+
+        std::string GnomeUtils::getCommaSeparatedSSIDs(const std::list<std::string>& ssids) {
+            std::string result;
+            for (auto it = ssids.begin(); it != ssids.end(); ++it) {
+                result += *it;
+                if (std::next(it) != ssids.end()) {
+                    result += ", ";
+                }
+            }
+            return result;
+        }
 
         void GnomeUtils::printKeyVariant(const char *setting_name, GVariant *setting)
         {
@@ -51,7 +62,138 @@ namespace WPEFramework
             }
         }
 
-        bool GnomeUtils::getDeviceByIpIface(GDBusConnection *connection, const gchar *iface_name, std::string& path)
+        // TODO change this function 
+        const char* GnomeUtils::getWifiIfname() { return ifnameWlan; }
+        const char* GnomeUtils::getEthIfname() { return ifnameEth; }
+
+        bool GnomeUtils::getCachedPropertyU(GDBusProxy* proxy, const char* propertiy, uint32_t *value)
+        {
+            GVariant* result = NULL;
+            result = g_dbus_proxy_get_cached_property(proxy, propertiy);
+            if (!result) {
+                NMLOG_ERROR("Failed to get '%s' properties", propertiy);
+                g_object_unref(proxy);
+                return false;
+            }
+
+            if (g_variant_is_of_type (result, G_VARIANT_TYPE_UINT32)) {
+                *value = g_variant_get_uint32(result);
+                NMLOG_DEBUG("%s: %d", propertiy, *value);
+            }
+            else
+                NMLOG_WARNING("Unexpected type returned property: %s", g_variant_get_type_string(result));
+            g_variant_unref(result);
+            return true;
+        }
+
+        bool GnomeUtils::getDevicePropertiesByPath(GDBusConnection *dbusConn, const char* devicePath, deviceProperties& properties)
+        {
+            GError *error = NULL;
+            GVariant *devicesVar = NULL;
+            GDBusProxy* nmProxy = NULL;
+            u_int32_t value;
+
+            nmProxy = g_dbus_proxy_new_sync(dbusConn,
+                                G_DBUS_PROXY_FLAGS_NONE,
+                                                NULL,  // GDBusInterfaceInfo
+                                                "org.freedesktop.NetworkManager",  // Bus name
+                                                devicePath,  // Object path
+                                                "org.freedesktop.NetworkManager.Device",  // Interface name
+                                                NULL,  // GCancellable
+                                                &error);
+
+
+            if (error) {
+                NMLOG_ERROR("Error calling DBus.Properties method: %s", error->message);
+                g_error_free(error);
+                return false;
+            }
+
+
+            if(GnomeUtils::getCachedPropertyU(nmProxy, "DeviceType", &value))
+            {
+               properties.deviceType = static_cast<NMDeviceType>(value);
+            }
+            else
+                 NMLOG_ERROR("'DeviceType' property failed");
+
+            devicesVar = g_dbus_proxy_get_cached_property(nmProxy, "Interface");
+            if (devicesVar) {
+                const gchar *iface = g_variant_get_string(devicesVar, NULL);
+                if(iface != NULL)
+                    properties.interface = iface;
+                NMLOG_DEBUG("Interface: %s", iface);
+                g_variant_unref(devicesVar);
+            }
+            else
+                NMLOG_ERROR("'Interface' property failed");
+
+            guint32 devState, stateReason;
+            devicesVar = g_dbus_proxy_get_cached_property(nmProxy, "StateReason");
+            if (devicesVar) {
+                g_variant_get(devicesVar, "(uu)", &devState, &stateReason);
+                properties.state = static_cast<NMDeviceState>(devState);
+                properties.stateReason = static_cast<NMDeviceStateReason>(stateReason);
+                g_variant_unref(devicesVar);
+            }
+            else
+                NMLOG_ERROR("'StateReason' property failed");
+            
+            g_object_unref(nmProxy);
+            return true;
+        }
+
+        bool GnomeUtils::getDevicePropertiesByIfname(GDBusConnection *dbusConn, const char* ifaceName, deviceProperties& properties)
+        {
+             GError *error = NULL;
+            GVariant *devicesVar = NULL;
+            bool ret = false;
+
+            GDBusProxy* nmProxy  = g_dbus_proxy_new_sync(dbusConn,
+                            G_DBUS_PROXY_FLAGS_NONE,
+                            NULL,
+                            "org.freedesktop.NetworkManager",
+                            "/org/freedesktop/NetworkManager",
+                            "org.freedesktop.NetworkManager",
+                            NULL,
+                            &error);
+
+            devicesVar = g_dbus_proxy_call_sync(nmProxy, "GetDevices", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+            if (error) {
+                NMLOG_ERROR("Error calling GetDevices method: %s", error->message);
+                g_error_free(error);
+                g_object_unref(nmProxy);
+                return false;
+            }
+
+            GVariantIter* iter;
+            const gchar* devicePath;
+            g_variant_get(devicesVar, "(ao)", &iter);
+            while (g_variant_iter_loop(iter, "o", &devicePath))
+            {
+                if(devicePath != NULL )
+                {
+                    if(getDevicePropertiesByPath(dbusConn, devicePath, properties) && properties.interface == ifaceName)
+                    {
+                        properties.path = devicePath;
+                        ret = true;
+                        break;
+                    }
+                }
+            }
+            g_variant_iter_free(iter);
+
+            if(!ret)
+                NMLOG_ERROR("'%s' interface not found", ifaceName);
+
+            if(devicesVar)
+                g_variant_unref(devicesVar);
+            if(nmProxy)
+                g_object_unref(nmProxy);
+            return ret;
+        }
+
+        bool GnomeUtils::getDeviceByIpIface(GDBusConnection *dbusConn, const gchar *iface_name, std::string& path)
         {
             // TODO Fix Error calling method: 
             // GDBus.Error:org.freedesktop.NetworkManager.UnknownDevice: No device found for the requested iface 
@@ -62,7 +204,7 @@ namespace WPEFramework
             bool ret = false;
 
             result = g_dbus_connection_call_sync(
-                connection,
+                dbusConn,
                 "org.freedesktop.NetworkManager",               // D-Bus name
                 "/org/freedesktop/NetworkManager",              // Object path
                 "org.freedesktop.NetworkManager",               // Interface
@@ -93,23 +235,6 @@ namespace WPEFramework
             //NMLOG_DEBUG("%s device path %s", iface_name, path.c_str());
             g_variant_unref(result);
             return ret;
-        }
-
-        static bool get_cached_property_u(GDBusProxy* proxy, const char* propertiy, uint32_t value)
-        {
-            GVariant* result = NULL;
-            result = g_dbus_proxy_get_cached_property(proxy, propertiy);
-            if (!result) {
-                NMLOG_ERROR("Failed to get AP properties");
-                g_object_unref(proxy);
-                return false;
-            }
-            if (g_variant_is_of_type (result, G_VARIANT_TYPE_UINT32)) {
-                value = g_variant_get_uint32 (result);
-                NMLOG_DEBUG("%s: %d", propertiy, value);
-            }
-            g_variant_unref(result);
-            return true;
         }
 
         bool GnomeUtils::getApDetails(GDBusConnection *connection, const char* apPath, apProperties& apDetails)
@@ -172,11 +297,11 @@ namespace WPEFramework
             NMLOG_DEBUG("strength %d", strength);
             g_variant_unref(result);
 
-            get_cached_property_u(proxy, "Flags", apDetails.flags);
-            get_cached_property_u(proxy, "WpaFlags", apDetails.wpaFlags);
-            get_cached_property_u(proxy, "RsnFlags", apDetails.rsnFlags);
-            get_cached_property_u(proxy, "Mode", apDetails.mode);
-            get_cached_property_u(proxy, "Frequency", apDetails.frequency);
+            GnomeUtils::getCachedPropertyU(proxy, "Flags", &apDetails.flags);
+            GnomeUtils::getCachedPropertyU(proxy, "WpaFlags", &apDetails.wpaFlags);
+            GnomeUtils::getCachedPropertyU(proxy, "RsnFlags", &apDetails.rsnFlags);
+            GnomeUtils::getCachedPropertyU(proxy, "Mode", &apDetails.mode);
+            GnomeUtils::getCachedPropertyU(proxy, "Frequency", &apDetails.frequency);
 
             g_object_unref(proxy);
 
@@ -251,91 +376,29 @@ namespace WPEFramework
 
         bool GnomeUtils::getDeviceState(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceState& state)
         {
-            GError *error = NULL;
-            GVariant *result;
-            std::string ifaceDevicePath;
-
-            if(!GnomeUtils::getDeviceByIpIface(dbusConn, iface_name, ifaceDevicePath) && !ifaceDevicePath.empty())
+            deviceProperties devProp;
+            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConn, iface_name, devProp))
             {
                 NMLOG_ERROR("Interface unknow to NetworkManger Deamon");
                 return false;
             }
 
-            result = g_dbus_connection_call_sync(
-                                    dbusConn,
-                                    "org.freedesktop.NetworkManager",               // D-Bus name
-                                    ifaceDevicePath.c_str(),                        // Object path
-                                    "org.freedesktop.DBus.Properties",              // Interface for property access
-                                    "Get",                                          // Method name for getting a property
-                                    g_variant_new("(ss)",                           // Input parameters (interface, property name)
-                                                "org.freedesktop.NetworkManager.Device",            // Interface name
-                                                "State"),               // Property name
-                                    G_VARIANT_TYPE("(v)"),                          // Expected return type (variant)
-                                    G_DBUS_CALL_FLAGS_NONE,
-                                    -1,                                             // Default timeout
-                                    NULL,
-                                    &error
-                                );
-            if (error != NULL) {
-                NMLOG_ERROR("failed to DBus.Properties: %s", error->message);
-                g_error_free(error);
-            } else {
-                GVariant *variantValue;
-                g_variant_get(result, "(v)", &variantValue);
-
-                state = static_cast<NMDeviceState>(g_variant_get_uint32(variantValue));
-                NMLOG_DEBUG("Device state: %u", state);
-
-                g_variant_unref(variantValue);
-                g_variant_unref(result);
-                return true;
-            }
-
-            return false;
+            state = devProp.state;
+            return true;
         }
 
         bool GnomeUtils::getDeviceStateReason(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceStateReason& StateReason)
         {
-            GError *error = NULL;
-            GVariant *resultReason;
-            std::string ifaceDevicePath;
-
-            if(!GnomeUtils::getDeviceByIpIface(dbusConn, iface_name, ifaceDevicePath) && !ifaceDevicePath.empty())
+            deviceProperties devProp;
+            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConn, iface_name, devProp))
             {
                 NMLOG_ERROR("Interface unknow to NetworkManger Deamon");
                 return false;
             }
 
-            resultReason = g_dbus_connection_call_sync( dbusConn,
-                                    "org.freedesktop.NetworkManager",
-                                    ifaceDevicePath.c_str(),
-                                    "org.freedesktop.DBus.Properties",
-                                    "Get",
-                                    g_variant_new("(ss)", 
-                                                "org.freedesktop.NetworkManager.Device",
-                                                "StateReason"),
-                                    G_VARIANT_TYPE("(v)"),
-                                    G_DBUS_CALL_FLAGS_NONE,
-                                    -1,
-                                    NULL,
-                                    &error
-                                );
-
-            if (error != NULL) {
-                NMLOG_ERROR("getting StateReason property: %s", error->message);
-                g_error_free(error);
-            } else if (resultReason != NULL) {
-                GVariant *variantReason;
-                g_variant_get(resultReason, "(v)", &variantReason);
-
-                guint32 state_reason_code, state_reason_detail;
-                g_variant_get(variantReason, "(uu)", &state_reason_code, &state_reason_detail);
-                NMLOG_WARNING("Device state reason: %u (detail: %u)", state_reason_code, state_reason_detail);
-                g_variant_unref(variantReason);
-                g_variant_unref(resultReason);
-                return true;
-            }
-            return false;
+            StateReason = devProp.stateReason;
+            NMLOG_WARNING("Device state: %u (reason: %u)", devProp.state, devProp.stateReason);
+            return true;
         }
 
     } // Plugin

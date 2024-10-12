@@ -39,18 +39,34 @@ struct apProperties
     uint8_t strength;
 };
 
+struct deviceProperties
+{
+    std::string interface;
+    std::string activeConnPath;
+    std::string path;
+    NMDeviceState state;
+    NMDeviceStateReason stateReason;
+    NMDeviceType deviceType;
+};
+
 namespace WPEFramework
 {
     namespace Plugin
     {
         class GnomeUtils {
             public:
+                static std::string getCommaSeparatedSSIDs(const std::list<std::string>& ssids);
                 static void printKeyVariant(const char *setting_name, GVariant *setting);
                 static bool getDeviceByIpIface(GDBusConnection *dbusConn, const gchar *iface_name, std::string& path);
                 static bool getApDetails(GDBusConnection *dbusConn, const char* apPath, apProperties& apDetails);
                 static bool getConnectionPaths(GDBusConnection *dbusConn, std::list<std::string>& pathsList);
                 static bool getDeviceState(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceState& state);
                 static bool getDeviceStateReason(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceStateReason& StateReason);
+                static bool getCachedPropertyU(GDBusProxy* proxy, const char* propertiy, uint32_t *value);
+                static bool getDevicePropertiesByPath(GDBusConnection *dbusConn, const char* devPath, deviceProperties& properties);
+                static bool getDevicePropertiesByIfname(GDBusConnection *dbusConn, const char* ifname, deviceProperties& properties);
+                static const char* getWifiIfname();
+                static const char* getEthIfname();
         };
 
     } // Plugin

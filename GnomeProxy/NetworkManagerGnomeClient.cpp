@@ -91,8 +91,7 @@ namespace WPEFramework
             GError *error = NULL;
             GDBusProxy *ConnProxy = NULL;
             GVariant *settingsProxy= NULL, *connection= NULL, *sCon= NULL;
-            bool isFound;
-            const char *connId= NULL, *connTyp= NULL, *iface= NULL;
+            const char *connTyp= NULL, *iface= NULL;
 
             ConnProxy = g_dbus_proxy_new_sync(dbusConn,
                                 G_DBUS_PROXY_FLAGS_NONE,
@@ -135,20 +134,18 @@ namespace WPEFramework
             if(strcmp(connTyp,"802-11-wireless") == 0)
             {
                 G_VARIANT_LOOKUP(sCon, "interface-name", "&s", &iface);
-                if(strcmp(iface,"wlan0") != 0)
+                if(strcmp(iface, GnomeUtils::getWifiIfname()) == 0)
                 {
-                    NMLOG_ERROR("interafce-name connection not wlan0");
-                    if (sCon)
-                        g_variant_unref(sCon);
+                    GVariant *setting = g_variant_lookup_value(connection, "802-11-wireless", NULL);
+                    if(setting)
+                    {
+                        std::string bssid;
+                        fetssidandbssid(setting, ssid, bssid);
+                        g_variant_unref(setting);
+                    }
                 }
-
-                GVariant *setting = g_variant_lookup_value(connection, "802-11-wireless", NULL);
-                if (setting)
-                {
-                    std::string bssid;
-                    fetssidandbssid(setting, ssid, bssid);
-                    g_variant_unref(setting);
-                }
+                else
+                    NMLOG_DEBUG("iface name in connection not wlan0, %s", iface);
             }
 
             if (sCon)
@@ -220,8 +217,7 @@ namespace WPEFramework
             for (const std::string& path : paths) {
                // NMLOG_DEBUG("connection path %s", path.c_str());
                 std::string ssid;
-                fetchSSIDFromConnection(dbusConnection.getConnection(), path, ssid);
-                if(!ssid.empty())
+                if(fetchSSIDFromConnection(dbusConnection.getConnection(), path, ssid) && !ssid.empty())
                     ssids.push_back(ssid);
             }
 
@@ -232,25 +228,22 @@ namespace WPEFramework
 
         bool NetworkManagerClient::getConnectedSSID(const Exchange::INetworkManager::WiFiSSIDInfo &ssidinfo)
         {
-            std::string wifiDevicePath;
             GError* error = NULL;
             GDBusProxy* wProxy = NULL;
             GVariant* result = NULL;
             gchar *activeApPath = NULL;
             bool ret = false;
-            NMDeviceState state;
+            deviceProperties properties;
 
-            if(!GnomeUtils::getDeviceByIpIface(dbusConnection.getConnection(),"wlan0", wifiDevicePath))
+            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConnection.getConnection(), GnomeUtils::getWifiIfname(), properties))
             {
                 NMLOG_ERROR("no wifi device found");
                 return false;
             }
 
-            if(GnomeUtils::getDeviceState(dbusConnection.getConnection(), "wlan0", state) && state < NM_DEVICE_STATE_DISCONNECTED)
+            if(properties.path.empty() || properties.state <= NM_DEVICE_STATE_DISCONNECTED)
             {
-                NMDeviceStateReason StateReason;
-                GnomeUtils::getDeviceStateReason(dbusConnection.getConnection(), "wlan0", StateReason);
-                NMLOG_ERROR("wifi device state is invallied");
+                NMLOG_WARNING("access point not active");
                 return false;
             }
 
@@ -258,14 +251,16 @@ namespace WPEFramework
                                     G_DBUS_PROXY_FLAGS_NONE,
                                     NULL,
                                     "org.freedesktop.NetworkManager",
-                                    wifiDevicePath.c_str(),
+                                    properties.path.c_str(),
                                     "org.freedesktop.NetworkManager.Device.Wireless",
                                     NULL, // GCancellable
                                     &error);
-
-            if (error) {
-                NMLOG_ERROR("Error creating proxy: %s", error->message);
-                g_error_free(error);
+            if(wProxy == NULL)
+            {
+                if (error) {
+                    NMLOG_ERROR("Error creating proxy: %s", error->message);
+                    g_error_free(error);
+                }
                 return false;
             }
 
@@ -299,20 +294,17 @@ namespace WPEFramework
         {
             GError* error = nullptr;
             GDBusProxy* wProxy = nullptr;
-            std::string wifiDevicePath;
-            NMDeviceState state;
+            deviceProperties properties;
 
-            if(GnomeUtils::getDeviceState(dbusConnection.getConnection(), "wlan0", state) && state < NM_DEVICE_STATE_DISCONNECTED)
+            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConnection.getConnection(), GnomeUtils::getWifiIfname(), properties))
             {
-                NMDeviceStateReason StateReason;
-                GnomeUtils::getDeviceStateReason(dbusConnection.getConnection(), "wlan0", StateReason);
-                NMLOG_ERROR("wifi device state is invallied");
+                NMLOG_ERROR("no wifi device found");
                 return false;
             }
 
-            if(!GnomeUtils::getDeviceByIpIface(dbusConnection.getConnection(),"wlan0", wifiDevicePath))
+            if(properties.path.empty() || properties.state < NM_DEVICE_STATE_DISCONNECTED)
             {
-                NMLOG_ERROR("no wifi device found");
+                NMLOG_WARNING("access point not active");
                 return false;
             }
 
@@ -320,7 +312,7 @@ namespace WPEFramework
                                     G_DBUS_PROXY_FLAGS_NONE,
                                     NULL,
                                     "org.freedesktop.NetworkManager",
-                                    wifiDevicePath.c_str(),
+                                    properties.path.c_str(),
                                     "org.freedesktop.NetworkManager.Device.Wireless",
                                     NULL,
                                     &error);
@@ -364,10 +356,17 @@ namespace WPEFramework
         {
             GError* error = NULL;
             GDBusProxy* wProxy = NULL;
-            std::string wifiDevicePath;
-            if(!GnomeUtils::getDeviceByIpIface(dbusConnection.getConnection(),"wlan0", wifiDevicePath))
+            deviceProperties properties;
+
+            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConnection.getConnection(), GnomeUtils::getWifiIfname(), properties))
             {
                 NMLOG_ERROR("no wifi device found");
+                return false;
+            }
+
+            if(properties.path.empty() || properties.state < NM_DEVICE_STATE_DISCONNECTED)
+            {
+                NMLOG_WARNING("access point not active");
                 return false;
             }
 
@@ -375,7 +374,7 @@ namespace WPEFramework
                                 G_DBUS_PROXY_FLAGS_NONE,
                                 NULL,
                                 "org.freedesktop.NetworkManager",
-                                wifiDevicePath.c_str(),
+                                properties.path.c_str(),
                                 "org.freedesktop.NetworkManager.Device.Wireless",
                                 NULL,
                                 &error);
@@ -397,7 +396,7 @@ namespace WPEFramework
             if (g_variant_is_of_type (timestampVariant, G_VARIANT_TYPE_INT64)) {
                 gint64 timestamp;
                 timestamp = g_variant_get_int64 (timestampVariant);
-                NMLOG_DEBUG("Last scan timestamp: %lld", timestamp);
+                NMLOG_DEBUG("Last scan timestamp: %lld", static_cast<long long int>(timestamp));
             } else {
                 g_warning("Unexpected variant type: %s", g_variant_get_type_string (timestampVariant));
             }
@@ -568,7 +567,7 @@ namespace WPEFramework
 
             g_variant_builder_add (&settingsBuilder, "{sv}",
                                 NM_SETTING_CONNECTION_INTERFACE_NAME,
-                                g_variant_new_string ("wlan0"));
+                                g_variant_new_string (GnomeUtils::getWifiIfname()));
 
             g_variant_builder_add (&settingsBuilder, "{sv}",
                                 NM_SETTING_CONNECTION_TYPE,
@@ -728,6 +727,19 @@ namespace WPEFramework
             //TODO check if same connection is there and 
             //   verify ssid and password is same call read connection path and activate connection 
             //   if not same remove the connection
+            deviceProperties properties;
+
+            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConnection.getConnection(), GnomeUtils::getWifiIfname(), properties))
+            {
+                NMLOG_ERROR("no wifi device found");
+                return false;
+            }
+
+            if(properties.path.empty() || properties.state == NM_DEVICE_STATE_UNKNOWN)
+            {
+                NMLOG_WARNING("access point not active");
+                return false;
+            }
 
             ret = gVariantConnectionBuilder(ssidinfo, connBuilder);
             if(!ret) {
@@ -735,13 +747,7 @@ namespace WPEFramework
                 return false;
             }
 
-            std::string wifiDevicePath;
-            if(!GnomeUtils::getDeviceByIpIface(dbusConnection.getConnection(),"wlan0", wifiDevicePath)) {
-                NMLOG_ERROR("no wifi device found");
-                return false;
-            }
-
-            if(addNewConnctionAndactivate(dbusConnection.getConnection(), connBuilder, wifiDevicePath.c_str(), ssidinfo.m_persistSSIDInfo))
+            if(addNewConnctionAndactivate(dbusConnection.getConnection(), connBuilder, properties.path.c_str(), ssidinfo.m_persistSSIDInfo))
                 NMLOG_INFO("wifi connect request success");
             else
                 NMLOG_ERROR("wifi connect request Failed");
@@ -753,25 +759,25 @@ namespace WPEFramework
         {
             GError* error = NULL;
             GDBusProxy* wProxy = NULL;
-            std::string wifiDevicePath;
-            NMDeviceState state;
-            if(GnomeUtils::getDeviceState(dbusConnection.getConnection(), "wlan0", state) && state <= NM_DEVICE_STATE_DISCONNECTED)
-            {
-                NMLOG_ERROR("wifi device state is disconneted");
-                return true;
-            }
+            deviceProperties properties;
 
-            if(!GnomeUtils::getDeviceByIpIface(dbusConnection.getConnection(),"wlan0", wifiDevicePath))
+            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConnection.getConnection(), GnomeUtils::getWifiIfname(), properties) || properties.path.empty())
             {
                 NMLOG_ERROR("no wifi device found");
                 return false;
+            }
+
+            if(properties.state <= NM_DEVICE_STATE_DISCONNECTED)
+            {
+                NMLOG_WARNING("access point alreafy disconnected state");
+                return true;
             }
 
             wProxy = g_dbus_proxy_new_sync(dbusConnection.getConnection(),
                                 G_DBUS_PROXY_FLAGS_NONE,
                                 NULL,
                                 "org.freedesktop.NetworkManager",
-                                wifiDevicePath.c_str(),
+                                properties.path.c_str(),
                                 "org.freedesktop.NetworkManager.Device",
                                 NULL,
                                 &error);
@@ -782,7 +788,7 @@ namespace WPEFramework
                 return false;
             }
 
-            GVariant* result = g_dbus_proxy_call_sync(wProxy, "Disconnect", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+            g_dbus_proxy_call_sync(wProxy, "Disconnect", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
             if (error) {
                 NMLOG_ERROR("Error calling Disconnect method: %s", error->message);
                 g_error_free(error);

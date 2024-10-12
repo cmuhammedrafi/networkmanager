@@ -24,7 +24,7 @@ set_target_properties(${RPI_TEST} PROPERTIES
 )
 
 # Add compiler options, such as forced include of a specific header
-target_compile_options(${RPI_TEST} PRIVATE -include ${CMAKE_SOURCE_DIR}/INetworkManager.h)
+target_compile_options(${RPI_TEST} PRIVATE -Wall -include ${CMAKE_SOURCE_DIR}/INetworkManager.h)
 
 target_include_directories(${RPI_TEST} PRIVATE ${GLIB_INCLUDE_DIRS} ${LIBNM_INCLUDE_DIRS} ${GIO_INCLUDE_DIRS} ${PROJECT_SOURCE_DIR})
 target_include_directories(${RPI_TEST} PRIVATE GnomeProxy)
