@@ -722,11 +722,6 @@ namespace WPEFramework
         {
             GVariantBuilder connBuilder;
             bool ret = false;
-
-            //TODO check if wificonnected to same ssid
-            //TODO check if same connection is there and 
-            //   verify ssid and password is same call read connection path and activate connection 
-            //   if not same remove the connection
             deviceProperties properties;
 
             if(!GnomeUtils::getDevicePropertiesByIfname(dbusConnection.getConnection(), GnomeUtils::getWifiIfname(), properties))
@@ -737,9 +732,18 @@ namespace WPEFramework
 
             if(properties.path.empty() || properties.state == NM_DEVICE_STATE_UNKNOWN)
             {
-                NMLOG_WARNING("access point not active");
+                NMLOG_WARNING("wlan0 interface not active");
                 return false;
             }
+
+            /*
+             *
+             * 1. check interface state
+             * 2. check available connection check ssid and password security matches
+             * 3. if matches use the same connection to activate
+             * 4. else remove connection if same conn name
+             * 5. then activate new connection
+             */
 
             ret = gVariantConnectionBuilder(ssidinfo, connBuilder);
             if(!ret) {
@@ -750,7 +754,7 @@ namespace WPEFramework
             if(addNewConnctionAndactivate(dbusConnection.getConnection(), connBuilder, properties.path.c_str(), ssidinfo.m_persistSSIDInfo))
                 NMLOG_INFO("wifi connect request success");
             else
-                NMLOG_ERROR("wifi connect request Failed");
+                NMLOG_ERROR("wifi connect request failed");
 
             return true;
         }
