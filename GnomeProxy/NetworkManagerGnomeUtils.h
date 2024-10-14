@@ -27,6 +27,8 @@
 // #include <NetworkManager.h>
 #include <nm-dbus-interface.h>
 
+using namespace std;
+
 struct apProperties
 {
     uint32_t flags;
@@ -60,6 +62,7 @@ namespace WPEFramework
                 static bool getDeviceByIpIface(GDBusConnection *dbusConn, const gchar *iface_name, std::string& path);
                 static bool getApDetails(GDBusConnection *dbusConn, const char* apPath, apProperties& apDetails);
                 static bool getConnectionPaths(GDBusConnection *dbusConn, std::list<std::string>& pathsList);
+                static bool getwifiConnectionPaths(GDBusConnection *dbusConn,const char* devicePath, std::list<std::string>& paths);
                 static bool getDeviceState(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceState& state);
                 static bool getDeviceStateReason(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceStateReason& StateReason);
                 static bool getCachedPropertyU(GDBusProxy* proxy, const char* propertiy, uint32_t *value);

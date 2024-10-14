@@ -31,7 +31,7 @@ namespace WPEFramework
     namespace Plugin
     {
         static const char* ifnameEth = "eth0";
-        static const char* ifnameWlan = "wlp0s20f3";
+        static const char* ifnameWlan = "wlan0";
 
         std::string GnomeUtils::getCommaSeparatedSSIDs(const std::list<std::string>& ssids) {
             std::string result;
@@ -78,7 +78,7 @@ namespace WPEFramework
 
             if (g_variant_is_of_type (result, G_VARIANT_TYPE_UINT32)) {
                 *value = g_variant_get_uint32(result);
-                NMLOG_DEBUG("%s: %d", propertiy, *value);
+                //NMLOG_DEBUG("%s: %d", propertiy, *value);
             }
             else
                 NMLOG_WARNING("Unexpected type returned property: %s", g_variant_get_type_string(result));
@@ -122,7 +122,7 @@ namespace WPEFramework
                 const gchar *iface = g_variant_get_string(devicesVar, NULL);
                 if(iface != NULL)
                     properties.interface = iface;
-                NMLOG_DEBUG("Interface: %s", iface);
+                //NMLOG_DEBUG("Interface: %s", iface);
                 g_variant_unref(devicesVar);
             }
             else
@@ -145,7 +145,7 @@ namespace WPEFramework
 
         bool GnomeUtils::getDevicePropertiesByIfname(GDBusConnection *dbusConn, const char* ifaceName, deviceProperties& properties)
         {
-             GError *error = NULL;
+            GError *error = NULL;
             GVariant *devicesVar = NULL;
             bool ret = false;
 
@@ -306,6 +306,52 @@ namespace WPEFramework
             g_object_unref(proxy);
 
             return true;
+        }
+
+        bool GnomeUtils::getwifiConnectionPaths(GDBusConnection *dbusConn, const char* devicePath, std::list<std::string>& paths)
+        {
+            GError *error = NULL;
+            GDBusProxy* nmProxy = NULL;
+            GVariant* result = NULL;
+            bool ret = false;
+            nmProxy = g_dbus_proxy_new_sync(dbusConn,
+                                G_DBUS_PROXY_FLAGS_NONE,
+                                                NULL,
+                                                "org.freedesktop.NetworkManager",
+                                                devicePath,
+                                                "org.freedesktop.NetworkManager.Device",
+                                                NULL,
+                                                &error);
+
+            if (error) {
+                NMLOG_ERROR("Error calling DBus.Properties method: %s", error->message);
+                g_error_free(error);
+                return ret;
+            }
+
+            result = g_dbus_proxy_get_cached_property(nmProxy, "AvailableConnections");
+            if (!result) {
+                NMLOG_ERROR("Failed to get AvailableConnections property.");
+                g_object_unref(nmProxy);
+                return ret;
+            }
+
+            GVariantIter* iter;
+            const gchar* connPath = NULL;
+            g_variant_get(result, "ao", &iter);
+            while (g_variant_iter_loop(iter, "o", &connPath)) {
+                if(g_strdup(connPath) != NULL && g_strcmp0(connPath, "/") != 0)
+                {
+                    paths.push_back(connPath);
+                    // NMLOG_DEBUG("AvailableConnections Path: %s", connPath);
+                    ret = true;
+                }
+            }
+
+            g_variant_iter_free(iter);
+            g_variant_unref(result);
+            g_object_unref(nmProxy);
+            return ret;
         }
 
         bool GnomeUtils::getConnectionPaths(GDBusConnection *dbusConn, std::list<std::string>& pathsList)
