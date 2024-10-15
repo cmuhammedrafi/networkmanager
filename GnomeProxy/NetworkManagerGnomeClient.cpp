@@ -44,8 +44,7 @@ namespace WPEFramework
             NMLOG_INFO("NetworkManagerClient destroyed");
         }
 
-        static bool checkwifiConnectionDetails(GDBusConnection *dbusConn, const char* connPath, std::string ssid, 
-                                                        std::string keyMgmStr = "", std::string passwrd = "")
+        static bool getSSIDFromConnection(GDBusConnection *dbusConn, const std::string connPath, std::string& ssid)
         {
             GError *error = NULL;
             GDBusProxy *ConnProxy = NULL;
@@ -56,7 +55,7 @@ namespace WPEFramework
                                 G_DBUS_PROXY_FLAGS_NONE,
                                 NULL,
                                 "org.freedesktop.NetworkManager",
-                                connPath,
+                                connPath.c_str(),
                                 "org.freedesktop.NetworkManager.Settings.Connection",
                                 NULL,
                                 &error);
@@ -120,7 +119,6 @@ namespace WPEFramework
                                 if (ssid_data && ssid_length > 0 && ssid_length <= 32) {
                                     ssid.assign(reinterpret_cast<const char*>(ssid_data), ssid_length);
                                     NMLOG_DEBUG("SSID: %s", ssid.c_str());
-                                    ret = true;
                                 } else {
                                     NMLOG_ERROR("Invalid SSID length: %zu (maximum is 32)", ssid_length);
                                     ssid.empty();
@@ -133,120 +131,16 @@ namespace WPEFramework
                         setting = NULL;
                     }
 
-                    if(!ssid.empty() && !keyMgmStr.empty())
+                    if(!ssid.empty())
                     {
                         // 802-11-wireless-security.key-mgmt: wpa-psk
                         const char* keyMgmt = NULL;
                         setting = g_variant_lookup_value(connection, "802-11-wireless-security", NULL);
                         G_VARIANT_LOOKUP(setting, "key-mgmt", "&s", &keyMgmt);
                         NMLOG_DEBUG("802-11-wireless-security.key-mgmt: %s", keyMgmt);
-                        if(keyMgmt && strcmp(keyMgmt, keyMgmStr.c_str()) == 0)
-                        {
-                            // TODO read security sectert 
-                            NMLOG_WARNING("reading 802-11-wireless-security.psk");
-                        }
-                        else {
-                            NMLOG_WARNING("802-11-wireless-security.key-mgmt not matching %s", keyMgmt);
-                            ret = false;
-                        }
                         g_variant_unref(setting);
                         setting = NULL;
-                    }
-                }
-            }
-
-            if (gVarConn)
-                g_variant_unref(gVarConn);
-            if (connection)
-                g_variant_unref(connection);
-            if (settingsProxy)
-                g_variant_unref(settingsProxy);
-            g_object_unref(ConnProxy);
-    
-            return ret;
-        }
-
-        static bool getwifiConnectionDetails(GDBusConnection *dbusConn, const std::string connPath, std::string& ssid)
-        {
-            GError *error = NULL;
-            GDBusProxy *ConnProxy = NULL;
-            GVariant *settingsProxy= NULL, *connection= NULL, *gVarConn= NULL;
-            bool ret = false;
-
-            ConnProxy = g_dbus_proxy_new_sync(dbusConn,
-                                G_DBUS_PROXY_FLAGS_NONE,
-                                NULL,
-                                "org.freedesktop.NetworkManager",
-                                connPath.c_str(),
-                                "org.freedesktop.NetworkManager.Settings.Connection",
-                                NULL,
-                                &error);
-
-            if (error != NULL) {
-                NMLOG_ERROR("Failed to create proxy: %s", error->message);
-                g_error_free(error);
-                return false;
-            }
-
-            settingsProxy = g_dbus_proxy_call_sync(ConnProxy,
-                                    "GetSettings",
-                                    NULL,
-                                    G_DBUS_CALL_FLAGS_NONE,
-                                    -1,
-                                    NULL,
-                                    &error);
-            if (!settingsProxy) {
-                g_dbus_error_strip_remote_error(error);
-                NMLOG_ERROR("Failed to get connection settings: %s", error->message);
-                g_error_free(error);
-                g_object_unref(ConnProxy);
-                return false;
-            }
-
-            g_variant_get(settingsProxy, "(@a{sa{sv}})", &connection);
-            gVarConn = g_variant_lookup_value(connection, "connection", NULL);
-
-            if(gVarConn == NULL) {
-                NMLOG_ERROR("connection Gvarient Error");
-                g_variant_unref(settingsProxy);
-                g_object_unref(ConnProxy);
-                return false;
-            }
-
-            if(gVarConn)
-            {
-                const char *connTyp= NULL;
-                G_VARIANT_LOOKUP(gVarConn, "type", "&s", &connTyp);
-                if(strcmp(connTyp, "802-11-wireless") == 0)
-                {
-                    // 802-11-wireless.ssid: <ssid>
-                    GVariant *setting = NULL;
-                    setting = g_variant_lookup_value(connection, "802-11-wireless", NULL);
-                    if(setting)
-                    {
-                        GVariantIter iter;
-                        GVariant *value = NULL;
-                        const char  *propertyName;
-                        g_variant_iter_init(&iter, setting);
-                        while (g_variant_iter_next(&iter, "{&sv}", &propertyName, &value)) {
-                            if (strcmp(propertyName, "ssid") == 0) {
-                                // Decode SSID from GVariant of type "ay"
-                                gsize ssid_length = 0;
-                                const guchar *ssid_data = static_cast<const guchar*>(g_variant_get_fixed_array(value, &ssid_length, sizeof(guchar)));
-                                if (ssid_data && ssid_length > 0 && ssid_length <= 32) {
-                                    ssid.assign(reinterpret_cast<const char*>(ssid_data), ssid_length);
-                                    NMLOG_DEBUG("SSID: %s", ssid.c_str());
-                                    ret = true;
-                                } else {
-                                    NMLOG_ERROR("Invalid SSID length: %zu (maximum is 32)", ssid_length);
-                                    ssid.empty();
-                                }
-                            }
-                        }
-                        if(value)
-                            g_variant_unref(value);
-                        g_variant_unref(setting);
-                        setting = NULL;
+                        ret = true;
                     }
                 }
             }
@@ -321,7 +215,7 @@ namespace WPEFramework
             for (const std::string& path : paths) {
                // NMLOG_DEBUG("connection path %s", path.c_str());
                 std::string ssid;
-                if(getwifiConnectionDetails(dbusConnection.getConnection(), path, ssid) && !ssid.empty())
+                if(getSSIDFromConnection(dbusConnection.getConnection(), path, ssid) && !ssid.empty())
                     ssids.push_back(ssid);
             }
 
@@ -554,6 +448,80 @@ namespace WPEFramework
             return buf;
         }
 
+        bool updateConnctionAndactivate(GDBusConnection *dbusConn, GVariantBuilder& connBuilder, const char* devicePath, const char* connPath)
+        {
+            GDBusProxy* proxy = nullptr;
+            GError* error = nullptr;
+            GVariant* result = nullptr;
+
+            const char* service = "org.freedesktop.NetworkManager";
+            const char* objectPath = connPath;
+            const char* interface = "org.freedesktop.NetworkManager.Settings.Connection";
+
+            proxy = g_dbus_proxy_new_sync(dbusConn, 
+                            G_DBUS_PROXY_FLAGS_NONE, NULL, 
+                            service, objectPath, interface, 
+                            NULL, &error);
+
+            if (error) {
+                NMLOG_ERROR( "Failed to create proxy: %s", error->message);
+                g_clear_error(&error);
+                return false;
+            }
+
+            result = g_dbus_proxy_call_sync (proxy, "Update",
+                g_variant_new("(a{sa{sv}})", connBuilder),
+                G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
+
+            if (error) {
+                NMLOG_ERROR("Failed to call Update : %s", error->message);
+                g_clear_error(&error);
+                g_object_unref(proxy);
+                return false;
+            }
+
+            if(result)
+                g_variant_unref(result);
+            g_object_unref(proxy);
+
+            proxy = g_dbus_proxy_new_sync(dbusConn, 
+                            G_DBUS_PROXY_FLAGS_NONE, NULL, 
+                            service, "/org/freedesktop/NetworkManager", "org.freedesktop.NetworkManager", 
+                            NULL, &error);
+
+            if (error) {
+                NMLOG_ERROR( "Failed to create proxy: %s", error->message);
+                g_clear_error(&error);
+                return false;
+            }
+            const char* specificObject = "/";
+
+            result = g_dbus_proxy_call_sync (proxy, "ActivateConnection",
+                g_variant_new("(ooo)", connPath, devicePath, specificObject),
+                G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
+
+            if (error) {
+                NMLOG_ERROR("Failed to call ActivateConnection: %s", error->message);
+                g_clear_error(&error);
+                g_object_unref(proxy);
+                return false;
+            }
+
+            if(result) {
+                GVariant* activeConnVariant;
+                g_variant_get(result, "(@o)", &activeConnVariant);
+                const char* activeConnPath = g_variant_get_string(activeConnVariant, nullptr);
+                NMLOG_DEBUG("connPath %s; activeconn %s", connPath, activeConnPath);
+                g_variant_unref(activeConnVariant);
+            }
+
+            if(result)
+                g_variant_unref(result);
+            g_object_unref(proxy);
+
+            return true;
+        }
+
         bool addNewConnctionAndactivate(GDBusConnection *dbusConn, GVariantBuilder connBuilder, const char* devicePath, bool persist)
         {
             GDBusProxy* proxy = nullptr;
@@ -571,7 +539,7 @@ namespace WPEFramework
                             NULL, &error);
 
             if (error) {
-                std::cerr << "Failed to create proxy: " << error->message << std::endl;
+                NMLOG_ERROR( "Failed to create proxy: %s", error->message);
                 g_clear_error(&error);
                 return false;
             }
@@ -815,7 +783,7 @@ namespace WPEFramework
             for (const std::string& path : paths) {
                 // NMLOG_DEBUG("remove connection path %s", path.c_str());
                 std::string connSsid;
-                if(getwifiConnectionDetails(dbusConnection.getConnection(), path, connSsid) && connSsid == ssid) {
+                if(getSSIDFromConnection(dbusConnection.getConnection(), path, connSsid) && connSsid == ssid) {
                     ret = deleteConnection(dbusConnection.getConnection(), path, connSsid);
                 }
             }
@@ -830,15 +798,16 @@ namespace WPEFramework
         {
             GVariantBuilder connBuilder;
             bool ret = false, reuseConnection = false;
-            deviceProperties properties;
+            deviceProperties deviceProp;
+            std::string exsistingConn;
 
-            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConnection.getConnection(), GnomeUtils::getWifiIfname(), properties))
+            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConnection.getConnection(), GnomeUtils::getWifiIfname(), deviceProp))
             {
                 NMLOG_ERROR("no wifi device found");
                 return false;
             }
 
-            if(properties.path.empty() || properties.state == NM_DEVICE_STATE_UNKNOWN)
+            if(deviceProp.path.empty() || deviceProp.state == NM_DEVICE_STATE_UNKNOWN)
             {
                 NMLOG_WARNING("wlan0 interface not active");
                 return false;
@@ -854,13 +823,14 @@ namespace WPEFramework
              */
 
             std::list<std::string> paths;
-            if(GnomeUtils::getwifiConnectionPaths(dbusConnection.getConnection(), properties.path.c_str(), paths))
+            if(GnomeUtils::getwifiConnectionPaths(dbusConnection.getConnection(), deviceProp.path.c_str(), paths))
             {
                 for (const std::string& path : paths) {
-                    std::string ssid, passwrd, passKeyTyp = "wpa-psk";
-                    if(checkwifiConnectionDetails(dbusConnection.getConnection(), path.c_str(), ssid, passKeyTyp, passwrd))
+                    std::string ssid, passKeyTyp = "wpa-psk";
+                    if(getSSIDFromConnection(dbusConnection.getConnection(), path, ssid) && ssid == ssidinfo.m_ssid)
                     {
-                        NMLOG_WARNING("same connection exsist (%s)", path.c_str());
+                        exsistingConn = path;
+                        NMLOG_WARNING("same connection exsist (%s)", exsistingConn.c_str());
                         reuseConnection = true;
                         break; // only one connection will be activate (same property only)
                     }
@@ -870,6 +840,16 @@ namespace WPEFramework
             if(reuseConnection)
             {
                 NMLOG_INFO("activating connection...");
+                ret = gVariantConnectionBuilder(ssidinfo, connBuilder);
+                if(!ret) {
+                    NMLOG_WARNING("connection builder failed");
+                    return false;
+                }
+
+                if(updateConnctionAndactivate(dbusConnection.getConnection(), connBuilder, deviceProp.path.c_str(), exsistingConn.c_str()))
+                    NMLOG_INFO("updated connection request success");
+                else
+                    NMLOG_ERROR("wifi connect request failed");
             }
             else 
             {
@@ -878,8 +858,7 @@ namespace WPEFramework
                     NMLOG_WARNING("connection builder failed");
                     return false;
                 }
-                return false;
-                if(addNewConnctionAndactivate(dbusConnection.getConnection(), connBuilder, properties.path.c_str(), ssidinfo.m_persistSSIDInfo))
+                if(addNewConnctionAndactivate(dbusConnection.getConnection(), connBuilder, deviceProp.path.c_str(), ssidinfo.m_persistSSIDInfo))
                     NMLOG_INFO("wifi connect request success");
                 else
                     NMLOG_ERROR("wifi connect request failed");
