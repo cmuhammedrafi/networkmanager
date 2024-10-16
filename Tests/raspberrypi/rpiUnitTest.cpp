@@ -26,7 +26,7 @@ int main() {
         }
 
         Exchange::INetworkManager::WiFiSSIDInfo ssidinfo_test;
-        //nmClient->getConnectedSSID(ssidinfo_test);
+        nmClient->getConnectedSSID(ssidinfo_test);
     //     //std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
 

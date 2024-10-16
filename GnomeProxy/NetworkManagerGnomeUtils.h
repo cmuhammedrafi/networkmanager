@@ -26,6 +26,7 @@
 /* include NetworkManager.h for the defines, but we don't link against libnm. */
 // #include <NetworkManager.h>
 #include <nm-dbus-interface.h>
+#include "INetworkManager.h"
 
 using namespace std;
 
@@ -57,10 +58,9 @@ namespace WPEFramework
     {
         class GnomeUtils {
             public:
-                static std::string getCommaSeparatedSSIDs(const std::list<std::string>& ssids);
                 static void printKeyVariant(const char *setting_name, GVariant *setting);
                 static bool getDeviceByIpIface(GDBusConnection *dbusConn, const gchar *iface_name, std::string& path);
-                static bool getApDetails(GDBusConnection *dbusConn, const char* apPath, apProperties& apDetails);
+                static bool getApDetails(GDBusConnection *connection, const char* apPath, Exchange::INetworkManager::WiFiSSIDInfo& wifiInfo);
                 static bool getConnectionPaths(GDBusConnection *dbusConn, std::list<std::string>& pathsList);
                 static bool getwifiConnectionPaths(GDBusConnection *dbusConn,const char* devicePath, std::list<std::string>& paths);
                 static bool getDeviceState(GDBusConnection *dbusConn, const gchar *iface_name, NMDeviceState& state);
@@ -68,6 +68,10 @@ namespace WPEFramework
                 static bool getCachedPropertyU(GDBusProxy* proxy, const char* propertiy, uint32_t *value);
                 static bool getDevicePropertiesByPath(GDBusConnection *dbusConn, const char* devPath, deviceProperties& properties);
                 static bool getDevicePropertiesByIfname(GDBusConnection *dbusConn, const char* ifname, deviceProperties& properties);
+
+                static std::string getCommaSeparatedSSIDs(const std::list<std::string>& ssids);
+                static const char* convertPercentageToSignalStrengtStr(int percentage);
+                static uint8_t wifiSecurityModeFromApFlags(guint32 flags, guint32 wpaFlags, guint32 rsnFlags);
                 static const char* getWifiIfname();
                 static const char* getEthIfname();
         };

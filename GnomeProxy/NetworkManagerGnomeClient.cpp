@@ -224,7 +224,7 @@ namespace WPEFramework
             return true;
         }
 
-        bool NetworkManagerClient::getConnectedSSID(const Exchange::INetworkManager::WiFiSSIDInfo &ssidinfo)
+        bool NetworkManagerClient::getConnectedSSID(Exchange::INetworkManager::WiFiSSIDInfo &ssidinfo)
         {
             GError* error = NULL;
             GDBusProxy* wProxy = NULL;
@@ -273,10 +273,8 @@ namespace WPEFramework
             if(g_strdup(activeApPath) != NULL && g_strcmp0(activeApPath, "/") != 0)
             {
                 //NMLOG_DEBUG("ActiveAccessPoint property path %s", activeApPath);
-                apProperties apDetails;
-                if(GnomeUtils::getApDetails(dbusConnection.getConnection(), g_strdup(activeApPath), apDetails))
+                if(GnomeUtils::getApDetails(dbusConnection.getConnection(), g_strdup(activeApPath), ssidinfo))
                 {
-                    NMLOG_INFO("getApDetails success");
                     ret = true;
                 }
             }
@@ -334,9 +332,9 @@ namespace WPEFramework
             g_variant_get(result, "(ao)", &iter);
 
             while (g_variant_iter_loop(iter, "o", &apPath)) {
-                apProperties apDetails;
+                Exchange::INetworkManager::WiFiSSIDInfo wifiInfo = {0};
                 NMLOG_DEBUG("Access Point Path: %s", apPath);
-                if(!GnomeUtils::getApDetails(dbusConnection.getConnection(), apPath, apDetails))
+                if(!GnomeUtils::getApDetails(dbusConnection.getConnection(), apPath, wifiInfo))
                 {
                     NMLOG_WARNING("getApDetails failed");
                 }
@@ -865,9 +863,11 @@ namespace WPEFramework
         bool NetworkManagerClient::getWiFiSignalStrength(string& ssid, string& signalStrength, Exchange::INetworkManager::WiFiSignalQuality& quality)
         {
             Exchange::INetworkManager::WiFiSSIDInfo ssidInfo;
-            int signalStrengthInt= 0;
+            const float signalStrengthThresholdExcellent = -50.0f;
+            const float signalStrengthThresholdGood = -60.0f;
+            const float signalStrengthThresholdFair = -67.0f;
 
-            if(getConnectedSSID(ssidInfo))
+            if(!getConnectedSSID(ssidInfo))
             {
                 NMLOG_ERROR("no wifi connected");
                 return false;
@@ -877,22 +877,23 @@ namespace WPEFramework
                 ssid = ssidInfo.m_ssid;
                 signalStrength = ssidInfo.m_signalStrength;
 
+	            float signalStrengthFloat = 0.0f;
                 if(!signalStrength.empty())
-                    signalStrengthInt = std::stoi(signalStrength.c_str());
+                    signalStrengthFloat = std::stof(signalStrength.c_str());
 
-                if (signalStrengthInt == 0)
+                if (signalStrengthFloat == 0)
                     quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_DISCONNECTED;
-                else if (signalStrengthInt > 0 && signalStrengthInt <= 25)
-                    quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_WEAK;
-                else if (signalStrengthInt > 25 && signalStrengthInt <= 50)
-                    quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_FAIR;
-                else if (signalStrengthInt > 50 && signalStrengthInt <= 75)
-                    quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_GOOD;
-                else // signalStrengthInt > 75
+                else if (signalStrengthFloat >= signalStrengthThresholdExcellent && signalStrengthFloat < 0)
                     quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_EXCELLENT;
-
-                NMLOG_INFO ("wifi signal strength success %s", signalStrength.c_str());
+                else if (signalStrengthFloat >= signalStrengthThresholdGood && signalStrengthFloat < signalStrengthThresholdExcellent)
+                    quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_GOOD;
+                else if (signalStrengthFloat >= signalStrengthThresholdFair && signalStrengthFloat < signalStrengthThresholdGood)
+                    quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_FAIR;
+                else
+                    quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_WEAK;
+                NMLOG_INFO("strength success %s dBm", signalStrength.c_str());
             }
+
             return true;
         }
 

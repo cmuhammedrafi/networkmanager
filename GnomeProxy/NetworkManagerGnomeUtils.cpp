@@ -66,6 +66,54 @@ namespace WPEFramework
         const char* GnomeUtils::getWifiIfname() { return ifnameWlan; }
         const char* GnomeUtils::getEthIfname() { return ifnameEth; }
 
+        uint8_t GnomeUtils::wifiSecurityModeFromApFlags(guint32 flags, guint32 wpaFlags, guint32 rsnFlags)
+        {
+            uint8_t security = Exchange::INetworkManager::WIFI_SECURITY_NONE;
+            if ((flags == NM_802_11_AP_FLAGS_NONE) && (wpaFlags == NM_802_11_AP_SEC_NONE) && (rsnFlags == NM_802_11_AP_SEC_NONE))
+            {
+                security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_NONE;
+            }
+            else if( (flags & NM_802_11_AP_FLAGS_PRIVACY) && ((wpaFlags & NM_802_11_AP_SEC_PAIR_WEP40) || (rsnFlags & NM_802_11_AP_SEC_PAIR_WEP40)) )
+            {
+                security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WEP_64;
+            }
+            else if( (flags & NM_802_11_AP_FLAGS_PRIVACY) && ((wpaFlags & NM_802_11_AP_SEC_PAIR_WEP104) || (rsnFlags & NM_802_11_AP_SEC_PAIR_WEP104)) )
+            {
+                security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WEP_128;
+            }
+            else if((wpaFlags & NM_802_11_AP_SEC_PAIR_TKIP) || (rsnFlags & NM_802_11_AP_SEC_PAIR_TKIP))
+            {
+                security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK_TKIP;
+            }
+            else if((wpaFlags & NM_802_11_AP_SEC_PAIR_CCMP) || (rsnFlags & NM_802_11_AP_SEC_PAIR_CCMP))
+            {
+                security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK_AES;
+            }
+            else if ((rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_PSK) && (rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_802_1X))
+            {
+                security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_WPA2_ENTERPRISE;
+            }
+            else if(rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_PSK)
+            {
+                security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_WPA2_PSK;
+            }
+            else if((wpaFlags & NM_802_11_AP_SEC_GROUP_CCMP) || (rsnFlags & NM_802_11_AP_SEC_GROUP_CCMP))
+            {
+                security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA2_PSK_AES;
+            }
+            else if((wpaFlags & NM_802_11_AP_SEC_GROUP_TKIP) || (rsnFlags & NM_802_11_AP_SEC_GROUP_TKIP))
+            {
+                security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA2_PSK_TKIP;
+            }
+            else if((rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_OWE) || (rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_OWE_TM))
+            {
+                security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA3_SAE;
+            }
+            else
+                NMLOG_WARNING("security mode not defined (flag: %d, wpaFlags: %d, rsnFlags: %d)", flags, wpaFlags, rsnFlags);
+            return security;
+        }
+
         bool GnomeUtils::getCachedPropertyU(GDBusProxy* proxy, const char* propertiy, uint32_t *value)
         {
             GVariant* result = NULL;
@@ -236,10 +284,13 @@ namespace WPEFramework
             return ret;
         }
 
-        bool GnomeUtils::getApDetails(GDBusConnection *connection, const char* apPath, apProperties& apDetails)
+        bool GnomeUtils::getApDetails(GDBusConnection *connection, const char* apPath, Exchange::INetworkManager::WiFiSSIDInfo& wifiInfo)
         {
-            char *bssid = NULL;
+            guint32 flags= 0, wpaFlags= 0, rsnFlags= 0, freq= 0, bitrate= 0;
             uint8_t strength = 0;
+            NM80211Mode mode = NM_802_11_MODE_UNKNOWN;
+            bool ret = false;
+            char *_bssid = NULL;
             GError* error = NULL;
             GVariant* result = NULL;
 
@@ -269,8 +320,7 @@ namespace WPEFramework
             const guchar *ssid_data = static_cast<const guchar*>(g_variant_get_fixed_array(result, &ssid_length, sizeof(guchar)));
             if (ssid_data && ssid_length > 0 && ssid_length <= 32)
             {
-                apDetails.ssid.assign(reinterpret_cast<const char*>(ssid_data), ssid_length);
-                NMLOG_DEBUG("SSID: %s", apDetails.ssid.c_str());
+                wifiInfo.m_ssid.assign(reinterpret_cast<const char*>(ssid_data), ssid_length);
                 g_variant_unref(result);
 
                 result = g_dbus_proxy_get_cached_property(proxy,"HwAddress");
@@ -279,9 +329,10 @@ namespace WPEFramework
                     g_object_unref(proxy);
                     return false;
                 }
-                g_variant_get(result, "s", &bssid);
-                apDetails.bssid.assign(bssid);
-                NMLOG_DEBUG("bssid %s", apDetails.bssid.c_str());
+                g_variant_get(result, "s", &_bssid);
+                if(_bssid != NULL) {
+                    wifiInfo.m_bssid.assign(_bssid);
+                }
                 g_variant_unref(result);
 
                 result = g_dbus_proxy_get_cached_property(proxy,"Strength");
@@ -291,22 +342,63 @@ namespace WPEFramework
                     return false;
                 }
                 g_variant_get(result, "y", &strength);
-                NMLOG_DEBUG("strength %d", strength);
+                wifiInfo.m_signalStrength = GnomeUtils::convertPercentageToSignalStrengtStr((int)strength);
                 g_variant_unref(result);
 
-                GnomeUtils::getCachedPropertyU(proxy, "Flags", &apDetails.flags);
-                GnomeUtils::getCachedPropertyU(proxy, "WpaFlags", &apDetails.wpaFlags);
-                GnomeUtils::getCachedPropertyU(proxy, "RsnFlags", &apDetails.rsnFlags);
-                GnomeUtils::getCachedPropertyU(proxy, "Mode", &apDetails.mode);
-                GnomeUtils::getCachedPropertyU(proxy, "Frequency", &apDetails.frequency);
+                GnomeUtils::getCachedPropertyU(proxy, "Flags", &flags);
+                GnomeUtils::getCachedPropertyU(proxy, "WpaFlags", &wpaFlags);
+                GnomeUtils::getCachedPropertyU(proxy, "RsnFlags", &rsnFlags);
+                GnomeUtils::getCachedPropertyU(proxy, "Mode", (guint32*)&mode);
+                GnomeUtils::getCachedPropertyU(proxy, "Frequency", &freq);
+                GnomeUtils::getCachedPropertyU(proxy, "MaxBitrate", &bitrate);
+
+                wifiInfo.m_frequency = static_cast<double>(freq);
+                wifiInfo.m_rate = std::to_string(bitrate);
+                wifiInfo.m_securityMode = static_cast<Exchange::INetworkManager::WIFISecurityMode>(wifiSecurityModeFromApFlags(flags, wpaFlags, rsnFlags));
+
+                // NMLOG_DEBUG("SSID: %s", wifiInfo.m_ssid.c_str());
+                // NMLOG_DEBUG("bssid %s", wifiInfo.m_bssid.c_str());
+                // NMLOG_DEBUG("strength : %s dbm (%d%%)", wifiInfo.m_signalStrength.c_str(), strength);
+                // NMLOG_DEBUG("frequency : %f MHz", wifiInfo.m_frequency);
+                // NMLOG_DEBUG("bitrate : %s kbit/s", wifiInfo.m_rate.c_str());
+                // NMLOG_DEBUG("securityMode : %d", wifiInfo.m_securityMode);
+ 
+                // TODO add noice
+                ret = true;
             }
             else {
-                NMLOG_ERROR("Invalid SSID length: %zu (maximum is 32)", ssid_length);
+                NMLOG_WARNING("Invalid/hidden SSID: %zu (maximum is 32)", ssid_length);
+                ret = false;
             }
 
             g_object_unref(proxy);
 
-            return true;
+            return ret;
+        }
+
+        // Function to convert percentage (0-100) to dBm string
+        const char* GnomeUtils::convertPercentageToSignalStrengtStr(int percentage) {
+
+            if (percentage <= 0 || percentage > 100) {
+                return "";
+            }
+
+           /*
+            * -30 dBm to -50 dBm: Excellent signal strength.
+            * -50 dBm to -60 dBm: Very good signal strength.
+            * -60 dBm to -70 dBm: Good signal strength; acceptable for basic internet browsing.
+            * -70 dBm to -80 dBm: Weak signal; performance may degrade, slower speeds, and possible dropouts.
+            * -80 dBm to -90 dBm: Very poor signal; likely unusable or highly unreliable.
+            *  Below -90 dBm: Disconnected or too weak to establish a stable connection.
+            */
+
+            // dBm range: -30 dBm (strong) to -90 dBm (weak)
+            const int max_dBm = -30;
+            const int min_dBm = -90;
+            int dBm_value = max_dBm + ((min_dBm - max_dBm) * (100 - percentage)) / 100;
+            static char result[8]={0};
+            snprintf(result, sizeof(result), "%d", dBm_value);
+            return result;
         }
 
         bool GnomeUtils::getwifiConnectionPaths(GDBusConnection *dbusConn, const char* devicePath, std::list<std::string>& paths)
