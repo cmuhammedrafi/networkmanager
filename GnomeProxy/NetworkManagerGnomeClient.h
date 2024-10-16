@@ -48,9 +48,14 @@ namespace WPEFramework
                 bool getConnectedSSID(const Exchange::INetworkManager::WiFiSSIDInfo& ssidinfo);
                 bool addToKnownSSIDs(const Exchange::INetworkManager::WiFiConnectTo& ssidinfo);
                 bool removeKnownSSIDs(const std::string& ssid);
-                bool startWifiScanning(const std::string ssid = "");
+                bool startWifiScan(const std::string ssid = "");
                 bool wifiConnect(const Exchange::INetworkManager::WiFiConnectTo& ssidinfo);
                 bool wifiDisconnect();
+                bool getWifiState(Exchange::INetworkManager::WiFiState &state);
+                bool getWiFiSignalStrength(std::string& ssid, std::string& signalStrength, Exchange::INetworkManager::WiFiSignalQuality& quality);
+                bool startWPS(const Exchange::INetworkManager::WiFiWPS& method , const string& wps_pin ) {return false;}
+                bool stopWPS() {return false;}
+                bool stopWiFiScan() {return false;}
 
             private:
                 NetworkManagerClient();

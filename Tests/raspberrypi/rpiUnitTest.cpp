@@ -35,15 +35,18 @@ int main() {
     //     std::string psk ="123454321";
     //     nmClient->startWifiScanning();
 
-        Exchange::INetworkManager::WiFiConnectTo ssidinfo = {.m_ssid = "Mi12", 
-                                                             .m_passphrase = "1234567890",
+        Exchange::INetworkManager::WiFiConnectTo ssidinfo = {.m_ssid = "HomeNet", 
+                                                             .m_passphrase = "rafi@123",
                                                              .m_securityMode = WPEFramework::Exchange::INetworkManager::WIFI_SECURITY_WPA_PSK_AES,
                                                              .m_persistSSIDInfo = true
                                                              };
-        //nmClient->removeKnownSSIDs(ssidinfo.m_ssid);
-        nmClient->wifiConnect(ssidinfo);
-        sleep(30);
-        nmClient->wifiDisconnect();
+       // nmClient->wifiConnect(ssidinfo);
+       // sleep(10);
+        Exchange::INetworkManager::WiFiState state;
+        nmClient->getWifiState(state);
+        std::string ssid, signalStrength; 
+        Exchange::INetworkManager::WiFiSignalQuality quality;
+        nmClient->getWiFiSignalStrength(ssid, signalStrength, quality);
     }
     NMLOG_INFO("Program completed successfully");
     return 0;

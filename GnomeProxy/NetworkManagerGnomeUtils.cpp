@@ -72,11 +72,10 @@ namespace WPEFramework
             result = g_dbus_proxy_get_cached_property(proxy, propertiy);
             if (!result) {
                 NMLOG_ERROR("Failed to get '%s' properties", propertiy);
-                g_object_unref(proxy);
                 return false;
             }
-
-            if (g_variant_is_of_type (result, G_VARIANT_TYPE_UINT32)) {
+            
+            if (result != NULL && g_variant_is_of_type (result, G_VARIANT_TYPE_UINT32)) {
                 *value = g_variant_get_uint32(result);
                 //NMLOG_DEBUG("%s: %d", propertiy, *value);
             }
@@ -266,42 +265,44 @@ namespace WPEFramework
                 g_object_unref(proxy);
                 return false;
             }
+
             const guchar *ssid_data = static_cast<const guchar*>(g_variant_get_fixed_array(result, &ssid_length, sizeof(guchar)));
-            if (ssid_data && ssid_length > 0 && ssid_length <= 32) {
+            if (ssid_data && ssid_length > 0 && ssid_length <= 32)
+            {
                 apDetails.ssid.assign(reinterpret_cast<const char*>(ssid_data), ssid_length);
                 NMLOG_DEBUG("SSID: %s", apDetails.ssid.c_str());
-            } else {
+                g_variant_unref(result);
+
+                result = g_dbus_proxy_get_cached_property(proxy,"HwAddress");
+                if (!result) {
+                    NMLOG_ERROR("Failed to get AP properties.");
+                    g_object_unref(proxy);
+                    return false;
+                }
+                g_variant_get(result, "s", &bssid);
+                apDetails.bssid.assign(bssid);
+                NMLOG_DEBUG("bssid %s", apDetails.bssid.c_str());
+                g_variant_unref(result);
+
+                result = g_dbus_proxy_get_cached_property(proxy,"Strength");
+                if (!result) {
+                    NMLOG_ERROR("Failed to get AP properties.");
+                    g_object_unref(proxy);
+                    return false;
+                }
+                g_variant_get(result, "y", &strength);
+                NMLOG_DEBUG("strength %d", strength);
+                g_variant_unref(result);
+
+                GnomeUtils::getCachedPropertyU(proxy, "Flags", &apDetails.flags);
+                GnomeUtils::getCachedPropertyU(proxy, "WpaFlags", &apDetails.wpaFlags);
+                GnomeUtils::getCachedPropertyU(proxy, "RsnFlags", &apDetails.rsnFlags);
+                GnomeUtils::getCachedPropertyU(proxy, "Mode", &apDetails.mode);
+                GnomeUtils::getCachedPropertyU(proxy, "Frequency", &apDetails.frequency);
+            }
+            else {
                 NMLOG_ERROR("Invalid SSID length: %zu (maximum is 32)", ssid_length);
-                apDetails.ssid="---";
             }
-            g_variant_unref(result);
-
-            result = g_dbus_proxy_get_cached_property(proxy,"HwAddress");
-            if (!result) {
-                NMLOG_ERROR("Failed to get AP properties.");
-                g_object_unref(proxy);
-                return false;
-            }
-            g_variant_get(result, "s", &bssid);
-            apDetails.bssid.assign(bssid);
-            NMLOG_DEBUG("bssid %s", apDetails.bssid.c_str());
-            g_variant_unref(result);
-
-            result = g_dbus_proxy_get_cached_property(proxy,"Strength");
-            if (!result) {
-                NMLOG_ERROR("Failed to get AP properties.");
-                g_object_unref(proxy);
-                return false;
-            }
-            g_variant_get(result, "y", &strength);
-            NMLOG_DEBUG("strength %d", strength);
-            g_variant_unref(result);
-
-            GnomeUtils::getCachedPropertyU(proxy, "Flags", &apDetails.flags);
-            GnomeUtils::getCachedPropertyU(proxy, "WpaFlags", &apDetails.wpaFlags);
-            GnomeUtils::getCachedPropertyU(proxy, "RsnFlags", &apDetails.rsnFlags);
-            GnomeUtils::getCachedPropertyU(proxy, "Mode", &apDetails.mode);
-            GnomeUtils::getCachedPropertyU(proxy, "Frequency", &apDetails.frequency);
 
             g_object_unref(proxy);
 

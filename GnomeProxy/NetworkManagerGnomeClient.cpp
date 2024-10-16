@@ -272,7 +272,7 @@ namespace WPEFramework
             g_variant_get(result, "o", &activeApPath);
             if(g_strdup(activeApPath) != NULL && g_strcmp0(activeApPath, "/") != 0)
             {
-                NMLOG_DEBUG("ActiveAccessPoint property path %s", activeApPath);
+                //NMLOG_DEBUG("ActiveAccessPoint property path %s", activeApPath);
                 apProperties apDetails;
                 if(GnomeUtils::getApDetails(dbusConnection.getConnection(), g_strdup(activeApPath), apDetails))
                 {
@@ -321,8 +321,7 @@ namespace WPEFramework
                 return false;
             }
 
-            GVariant* result = g_dbus_proxy_call_sync(wProxy, "GetAccessPoints", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
-            // TODO change to GetAllAccessPoints to include hidden ssid 
+            GVariant* result = g_dbus_proxy_call_sync(wProxy, "GetAllAccessPoints", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
             if (error) {
                 NMLOG_ERROR("Error creating proxy: %s", error->message);
                 g_error_free(error);
@@ -350,7 +349,7 @@ namespace WPEFramework
             return true;
         }
 
-        bool NetworkManagerClient::startWifiScanning(const std::string ssid)
+        bool NetworkManagerClient::startWifiScan(const std::string ssid)
         {
             GError* error = NULL;
             GDBusProxy* wProxy = NULL;
@@ -528,7 +527,6 @@ namespace WPEFramework
             GError* error = nullptr;
             GVariant* result = nullptr;
 
-            // Define the D-Bus service, object path, and interface
             const char* service = "org.freedesktop.NetworkManager";
             const char* objectPath = "/org/freedesktop/NetworkManager";
             const char* interface = "org.freedesktop.NetworkManager";
@@ -713,54 +711,124 @@ namespace WPEFramework
 
         bool NetworkManagerClient::addToKnownSSIDs(const Exchange::INetworkManager::WiFiConnectTo& ssidinfo)
         {
+            // TODO check argument length
             GVariantBuilder connBuilder;
-            bool ret = false;
-            GVariant *result = NULL;
-            GError* error = nullptr;
-            const char *newConPath = NULL;
-            
-            // TODO check same connection found 
+            bool ret = false, reuseConnection = false;
+            GVariant *result        = NULL;
+            GError* error           = NULL;
+            const char *newConPath  = NULL;
+            std::string exsistingConn;
+            deviceProperties deviceProp;
 
-            ret = gVariantConnectionBuilder(ssidinfo, connBuilder);
-            if(!ret) {
-              NMLOG_WARNING("connection builder failed");
-              return false;
-            }
-
-            GDBusProxy *proxy = NULL;
-            proxy = g_dbus_proxy_new_sync(dbusConnection.getConnection(),
-                                G_DBUS_PROXY_FLAGS_NONE,
-                                NULL,
-                                "org.freedesktop.NetworkManager",
-                                "/org/freedesktop/NetworkManager/Settings",
-                                "org.freedesktop.NetworkManager.Settings",
-                                NULL,
-                                &error);
-                                
-            result = g_dbus_proxy_call_sync (proxy,
-                                        "AddConnection",
-                                        g_variant_new ("(a{sa{sv}})", &connBuilder),
-                                        G_DBUS_CALL_FLAGS_NONE, -1,
-                                        NULL, &error);
-
-            if (!proxy) {
-                g_dbus_error_strip_remote_error (error);
-                NMLOG_ERROR ("Could not create NetworkManager D-Bus proxy: %s", error->message);
-                g_error_free (error);
+            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConnection.getConnection(), GnomeUtils::getWifiIfname(), deviceProp))
+            {
+                NMLOG_ERROR("no wifi device found");
                 return false;
             }
 
-            if (result) {
-                g_variant_get (result, "(&o)", &newConPath);
-                NMLOG_INFO("Added: %s", newConPath);
-                g_variant_unref (result);
-            } else {
-                g_dbus_error_strip_remote_error (error);
-                NMLOG_ERROR("Error adding connection: %s", error->message);
-                g_clear_error (&error);
+            if(deviceProp.path.empty() || deviceProp.state == NM_DEVICE_STATE_UNKNOWN)
+            {
+                NMLOG_WARNING("wlan0 interface not active");
+                return false;
             }
 
-            return true;
+            std::list<std::string> paths;
+            if(GnomeUtils::getwifiConnectionPaths(dbusConnection.getConnection(), deviceProp.path.c_str(), paths))
+            {
+                for (const std::string& path : paths)
+                {
+                    std::string ssid;
+                    if(getSSIDFromConnection(dbusConnection.getConnection(), path, ssid) && ssid == ssidinfo.m_ssid)
+                    {
+                        exsistingConn = path;
+                        NMLOG_DEBUG("same connection exsist (%s) updating ...", exsistingConn.c_str());
+                        reuseConnection = true;
+                        break; // only one connection will be activate (same property only)
+                    }
+                }
+            }
+
+            if(!gVariantConnectionBuilder(ssidinfo, connBuilder))
+            {
+                NMLOG_WARNING("connection builder failed");
+                return false;
+            }
+
+            if(reuseConnection)
+            {
+                GDBusProxy* proxy = g_dbus_proxy_new_sync(dbusConnection.getConnection(), 
+                                    G_DBUS_PROXY_FLAGS_NONE, NULL, 
+                                    "org.freedesktop.NetworkManager", exsistingConn.c_str(),
+                                    "org.freedesktop.NetworkManager.Settings.Connection", 
+                                    NULL, &error);
+
+                if (error) {
+                    NMLOG_ERROR( "Failed to create proxy: %s", error->message);
+                    g_clear_error(&error);
+                    return false;
+                }
+
+                if(proxy != nullptr)
+                {
+                    result = g_dbus_proxy_call_sync (proxy, "Update",
+                                g_variant_new("(a{sa{sv}})", connBuilder),
+                                G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
+
+                    if (error == nullptr) {
+                        NMLOG_DEBUG("same connection updated success : %s", exsistingConn.c_str());
+                        ret = true;
+                    }
+                    else {
+                        NMLOG_ERROR("Failed to call Update : %s", error->message);
+                        g_clear_error(&error);
+                    }
+                    if(result)
+                        g_variant_unref (result);
+                    g_object_unref(proxy);
+                }
+            }
+            else
+            {
+                GDBusProxy *proxy = NULL;
+                proxy = g_dbus_proxy_new_sync(dbusConnection.getConnection(),
+                                    G_DBUS_PROXY_FLAGS_NONE,
+                                    NULL,
+                                    "org.freedesktop.NetworkManager",
+                                    "/org/freedesktop/NetworkManager/Settings",
+                                    "org.freedesktop.NetworkManager.Settings",
+                                    NULL,
+                                    &error);
+                if (proxy != nullptr)
+                {
+                    result = g_dbus_proxy_call_sync (proxy,
+                                                "AddConnection",
+                                                g_variant_new ("(a{sa{sv}})", &connBuilder),
+                                                G_DBUS_CALL_FLAGS_NONE, -1,
+                                                NULL, &error);
+
+                    if (error != nullptr) {
+                        g_dbus_error_strip_remote_error (error);
+                        NMLOG_ERROR ("Could not create NetworkManager/Settings proxy: %s", error->message);
+                        g_error_free (error);
+                        g_object_unref(proxy);
+                        return false;
+                    }
+
+                    if (result) {
+                        g_variant_get (result, "(&o)", &newConPath);
+                        NMLOG_INFO("Added a new connection: %s", newConPath);
+                        ret = true;
+                        g_variant_unref (result);
+                    } else {
+                        g_dbus_error_strip_remote_error (error);
+                        NMLOG_ERROR("Error adding connection: %s", error->message);
+                        g_clear_error (&error);
+                    }
+                    g_object_unref(proxy);
+                }
+            }
+
+            return ret;
         }
 
         bool NetworkManagerClient::removeKnownSSIDs(const std::string& ssid)
@@ -794,8 +862,81 @@ namespace WPEFramework
             return ret;
         }
 
+        bool NetworkManagerClient::getWiFiSignalStrength(string& ssid, string& signalStrength, Exchange::INetworkManager::WiFiSignalQuality& quality)
+        {
+            Exchange::INetworkManager::WiFiSSIDInfo ssidInfo;
+            int signalStrengthInt= 0;
+
+            if(getConnectedSSID(ssidInfo))
+            {
+                NMLOG_ERROR("no wifi connected");
+                return false;
+            }
+            else
+            {
+                ssid = ssidInfo.m_ssid;
+                signalStrength = ssidInfo.m_signalStrength;
+
+                if(!signalStrength.empty())
+                    signalStrengthInt = std::stoi(signalStrength.c_str());
+
+                if (signalStrengthInt == 0)
+                    quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_DISCONNECTED;
+                else if (signalStrengthInt > 0 && signalStrengthInt <= 25)
+                    quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_WEAK;
+                else if (signalStrengthInt > 25 && signalStrengthInt <= 50)
+                    quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_FAIR;
+                else if (signalStrengthInt > 50 && signalStrengthInt <= 75)
+                    quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_GOOD;
+                else // signalStrengthInt > 75
+                    quality = Exchange::INetworkManager::WiFiSignalQuality::WIFI_SIGNAL_EXCELLENT;
+
+                NMLOG_INFO ("wifi signal strength success %s", signalStrength.c_str());
+            }
+            return true;
+        }
+
+        bool NetworkManagerClient::getWifiState(Exchange::INetworkManager::WiFiState &state)
+        {
+            deviceProperties deviceProp;
+            state = Exchange::INetworkManager::WiFiState::WIFI_STATE_UNINSTALLED;
+
+            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConnection.getConnection(), GnomeUtils::getWifiIfname(), deviceProp))
+            {
+                NMLOG_ERROR("no wifi device found");
+                return false;
+            }
+            // Todo check NMDeviceStateReason for more information
+            switch(deviceProp.state)
+            {
+                case NM_DEVICE_STATE_ACTIVATED: 
+                    state = Exchange::INetworkManager::WiFiState::WIFI_STATE_CONNECTED;
+                    break;
+                case NM_DEVICE_STATE_PREPARE:
+                case NM_DEVICE_STATE_CONFIG:
+                    state = Exchange::INetworkManager::WiFiState::WIFI_STATE_PAIRING;
+                    break;
+                case NM_DEVICE_STATE_NEED_AUTH:
+                case NM_DEVICE_STATE_IP_CONFIG:
+                case NM_DEVICE_STATE_IP_CHECK:
+                case NM_DEVICE_STATE_SECONDARIES:
+                    state = Exchange::INetworkManager::WiFiState::WIFI_STATE_CONNECTING;
+                    break;
+                case NM_DEVICE_STATE_DEACTIVATING:
+                case NM_DEVICE_STATE_FAILED:
+                case NM_DEVICE_STATE_DISCONNECTED:
+                    state = Exchange::INetworkManager::WiFiState::WIFI_STATE_DISCONNECTED;
+                    break;
+                default:
+                    state = Exchange::INetworkManager::WiFiState::WIFI_STATE_DISABLED;
+            }
+            NMLOG_DEBUG("nm Wifi sate %d mapped state %d ", (int)deviceProp.state, (int)state);
+            return true;
+        }
+
         bool NetworkManagerClient::wifiConnect(const Exchange::INetworkManager::WiFiConnectTo& ssidinfo)
         {
+            // TODO check argument length password min 8 and 32
             GVariantBuilder connBuilder;
             bool ret = false, reuseConnection = false;
             deviceProperties deviceProp;
