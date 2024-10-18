@@ -506,6 +506,7 @@ namespace WPEFramework
                 pathsList.push_back(paths[i]);
             }
 
+            g_strfreev(paths);
             g_object_unref(sProxy);
             if(pathsList.empty())
                 return false;

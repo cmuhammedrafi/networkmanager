@@ -61,7 +61,7 @@ namespace WPEFramework
                 NetworkManagerClient();
                 ~NetworkManagerClient();
 
-                DbusConnectionManager dbusConnection;
+                DbusMgr dbusConnection;
         };
     } // Plugin
 } // WPEFramework

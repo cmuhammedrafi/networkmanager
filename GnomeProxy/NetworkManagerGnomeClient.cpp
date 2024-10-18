@@ -34,14 +34,11 @@ namespace WPEFramework
     {
 
         NetworkManagerClient::NetworkManagerClient() {
-            NMLOG_INFO("NetworkManagerClient created");
-            if (!dbusConnection.InitializeBusConnection("org.freedesktop.NetworkManager")) {
-                NMLOG_ERROR("Failed to initialize D-Bus connection for NetworkManager");
-            }
+            NMLOG_INFO("NetworkManagerClient");
         }
 
         NetworkManagerClient::~NetworkManagerClient() {
-            NMLOG_INFO("NetworkManagerClient destroyed");
+            NMLOG_INFO("~NetworkManagerClient");
         }
 
         static bool getSSIDFromConnection(GDBusConnection *dbusConn, const std::string connPath, std::string& ssid)
@@ -97,7 +94,7 @@ namespace WPEFramework
                 G_VARIANT_LOOKUP(gVarConn, "type", "&s", &connTyp);
                 if(strcmp(connTyp, "802-11-wireless") != 0)
                 {
-                    NMLOG_ERROR("connection is not 802-11-wireless type");
+                    //NMLOG_DEBUG("ERROR: connection is not 802-11-wireless type");
                     ret = false;
                 }
                 else
@@ -124,13 +121,14 @@ namespace WPEFramework
                                     ssid.empty();
                                 }
                             }
+                            if(value) {
+                                g_variant_unref(value);
+                                value = NULL;
+                            }
                         }
-                        if(value)
-                            g_variant_unref(value);
                         g_variant_unref(setting);
                         setting = NULL;
                     }
-
                     if(!ssid.empty())
                     {
                         // 802-11-wireless-security.key-mgmt: wpa-psk
@@ -931,7 +929,7 @@ namespace WPEFramework
                 default:
                     state = Exchange::INetworkManager::WiFiState::WIFI_STATE_DISABLED;
             }
-            NMLOG_DEBUG("nm Wifi sate %d mapped state %d ", (int)deviceProp.state, (int)state);
+            NMLOG_DEBUG("networkmanager wifi state (%d) mapped state (%d) ", (int)deviceProp.state, (int)state);
             return true;
         }
 

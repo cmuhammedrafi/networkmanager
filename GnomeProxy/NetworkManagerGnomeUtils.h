@@ -25,7 +25,7 @@
 
 /* include NetworkManager.h for the defines, but we don't link against libnm. */
 // #include <NetworkManager.h>
-#include <nm-dbus-interface.h>
+#include <libnm/nm-dbus-interface.h>
 #include "INetworkManager.h"
 
 using namespace std;

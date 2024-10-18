@@ -63,6 +63,84 @@ namespace WPEFramework
             return connection;
         }
 
+        DbusMgr::DbusMgr() : connection(nullptr), error(nullptr)
+        {
+            NMLOG_INFO("DbusMgr");
+            connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
+            if (!connection) {
+                NMLOG_FATAL("Error connecting to system bus: %s ", error->message);
+                g_error_free(error);
+            }
+        }
+
+        DbusMgr::~DbusMgr() {
+            NMLOG_INFO("~DbusMgr");
+            if (connection) {
+                g_object_unref(connection);
+                connection = nullptr;
+            }
+        }
+
+        GDBusConnection* DbusMgr::getConnection()
+        {
+            if (connection) {
+                return connection;
+            }
+
+            connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
+            if (!connection && error) {
+                NMLOG_FATAL("Error reconnecting to system bus: %s ", error->message);
+                g_error_free(error);
+                return nullptr;
+            }
+
+            flags = static_cast<GDBusProxyFlags>(G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES | G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START);
+            return connection;
+        }
+
+        GDBusProxy* DbusMgr::getNetworkManagerProxy()
+        {
+            nmProxy = NULL;
+            nmProxy = g_dbus_proxy_new_sync(
+                getConnection(), G_DBUS_PROXY_FLAGS_NONE, NULL, "org.freedesktop.NetworkManager",
+                "/org/freedesktop/NetworkManager",
+                "org.freedesktop.NetworkManager",
+                NULL,
+                &error
+            );
+    
+            if (nmProxy == NULL|| error != NULL) {
+                g_dbus_error_strip_remote_error(error);
+                NMLOG_FATAL("Error creating D-Bus proxy: %s", error->message);
+                g_error_free(error);
+                return nullptr;
+            }
+
+            return nmProxy;
+        }
+
+        GDBusProxy* DbusMgr::getNetworkManagerSettingsProxy()
+        {
+            return g_dbus_proxy_new_sync(
+                getConnection(), flags, NULL, "org.freedesktop.NetworkManager",
+                "/org/freedesktop/NetworkManager/Settings",
+                "org.freedesktop.NetworkManager.Settings",
+                NULL,
+                &error
+            );
+        }
+
+        GDBusProxy* DbusMgr::getNetworkManagerDeviceProxy(const char* devicePath)
+        {
+            return g_dbus_proxy_new_sync(
+                getConnection(), flags, NULL, "org.freedesktop.NetworkManager",
+                devicePath,
+                "org.freedesktop.NetworkManager.Device",
+                NULL,
+                &error
+            );
+        }
+
     } // Plugin
 } // WPEFramework
 

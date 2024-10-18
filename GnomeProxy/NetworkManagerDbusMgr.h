@@ -24,7 +24,7 @@
 #include <list>
 
 /* include NetworkManager.h for the defines, but we don't link against libnm. */
-#include <nm-dbus-interface.h>
+#include <libnm/nm-dbus-interface.h>
 
 namespace WPEFramework
 {
@@ -42,6 +42,24 @@ namespace WPEFramework
             private:
                 GDBusConnection* connection;
         };
+
+        class DbusMgr {
+            public:
+                DbusMgr();
+                ~DbusMgr();
+
+                GDBusProxy* getNetworkManagerProxy();
+                GDBusProxy* getNetworkManagerSettingsProxy();
+                GDBusProxy* getNetworkManagerDeviceProxy(const char* devicePath);
+                GDBusConnection* getConnection();
+
+            private:
+
+                GDBusConnection* connection;
+                GError* error;
+                GDBusProxyFlags flags;
+                GDBusProxy *nmProxy = NULL;
+            };
 
     }
 }
