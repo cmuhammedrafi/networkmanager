@@ -288,17 +288,17 @@ namespace WPEFramework
         {
             GError* error = nullptr;
             GDBusProxy* wProxy = nullptr;
-            deviceProperties properties;
+            deviceProperties devProperty;
 
-            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConnection.getConnection(), GnomeUtils::getWifiIfname(), properties))
+            if(!GnomeUtils::getDevicePropertiesByIfname(dbusConnection.getConnection(), GnomeUtils::getWifiIfname(), devProperty))
             {
                 NMLOG_ERROR("no wifi device found");
                 return false;
             }
 
-            if(properties.path.empty() || properties.state < NM_DEVICE_STATE_DISCONNECTED)
+            if(devProperty.path.empty() || devProperty.state < NM_DEVICE_STATE_DISCONNECTED)
             {
-                NMLOG_WARNING("access point not active");
+                NMLOG_ERROR("no wifi device found");
                 return false;
             }
 
@@ -306,7 +306,7 @@ namespace WPEFramework
                                     G_DBUS_PROXY_FLAGS_NONE,
                                     NULL,
                                     "org.freedesktop.NetworkManager",
-                                    properties.path.c_str(),
+                                    devProperty.path.c_str(),
                                     "org.freedesktop.NetworkManager.Device.Wireless",
                                     NULL,
                                     &error);
@@ -330,7 +330,7 @@ namespace WPEFramework
             g_variant_get(result, "(ao)", &iter);
 
             while (g_variant_iter_loop(iter, "o", &apPath)) {
-                Exchange::INetworkManager::WiFiSSIDInfo wifiInfo = {0};
+                Exchange::INetworkManager::WiFiSSIDInfo wifiInfo;
                 NMLOG_DEBUG("Access Point Path: %s", apPath);
                 if(!GnomeUtils::getApDetails(dbusConnection.getConnection(), apPath, wifiInfo))
                 {
@@ -665,7 +665,7 @@ namespace WPEFramework
                                 NM_SETTING_WIRELESS_SETTING_NAME,
                                 &settingsBuilder);
 
-            if(!ssidinfo.m_passphrase.empty())
+            if(!ssidinfo.m_passphrase.empty() && ssidinfo.m_passphrase.length() >= 8) // 8 minimium 8 character password
             {
                 /* Build up the '802-11-wireless-security' settings */
                 g_variant_builder_init (&settingsBuilder, G_VARIANT_TYPE ("a{sv}"));
@@ -681,6 +681,10 @@ namespace WPEFramework
                 g_variant_builder_add (&connBuilder, "{sa{sv}}",
                         NM_SETTING_WIRELESS_SECURITY_SETTING_NAME,
                         &settingsBuilder);
+            }
+            else {
+                NMLOG_WARNING("password error so set up as open!!!");
+                return false;
             }
 
             /* Build up the 'ipv4' Setting */

@@ -94,13 +94,21 @@ namespace WPEFramework
         }
 
         GVariant *lastScanVariant = g_variant_lookup_value(changed_properties, "LastScan", NULL);
-        if (lastScanVariant != NULL)
-        {
-            gint64 lastScanTime = g_variant_get_int64(lastScanVariant);
-            NMLOG_DEBUG("LastScan value changed: %" G_GINT64_FORMAT, lastScanTime);
-            g_variant_unref(lastScanVariant);
+        if (lastScanVariant == NULL)
+            return;
+
+        gint64 lastScanTime = g_variant_get_int64(lastScanVariant);
+        NMLOG_DEBUG("LastScan value changed: %" G_GINT64_FORMAT, lastScanTime);
+        g_variant_unref(lastScanVariant);
+
+        const gchar *object_path = g_dbus_proxy_get_object_path(proxy);
+        if (object_path == NULL) {
+            NMLOG_WARNING("Failed to get the proxy object path");
+            return;
         }
 
+        NMLOG_DEBUG("Proxy object path: %s", object_path);
+        NetworkManagerEvents::onAvailableSSIDsCb(object_path);
     }
 
     static bool subscribeForlastScanPropertyEvent(const gchar *wirelessPath)
@@ -331,6 +339,29 @@ namespace WPEFramework
         }
     }
 
+    static void addressChangeCb(GDBusProxy *proxy,
+                      GVariant *changed_properties,
+                      GStrv invalidated_properties,
+                      gpointer user_data)
+    {
+        if (changed_properties == NULL) {
+            NMLOG_FATAL("cb doesn't have changed_properties ");
+            return;
+        }
+         GVariant *AddressDataVariant = g_variant_lookup_value(changed_properties, "AddressData", NULL);
+         if (AddressDataVariant != NULL)
+         {
+        //     const gchar *primary_connection;
+        //     primary_connection = g_variant_get_string(primary_connection_variant, NULL);
+        //     if(primary_connection && g_strcmp0(primary_connection, "/") == 0)
+        //         NMLOG_WARNING("no active primary connection");
+        //     else if(primary_connection)
+        //         NMLOG_INFO("PrimaryConnection changed: %s", primary_connection);
+        //     else
+        //         NMLOG_ERROR("PrimaryConnection changed Null Error");
+         }
+    }
+
     static void monitorDevice(const gchar *devicePath, GDBusProxy *deviceProxy) 
     {
         std::string ifname = getInterafaceNameFormDevicePath(devicePath);
@@ -352,17 +383,30 @@ namespace WPEFramework
         if(ifname == GnomeUtils::getWifiIfname())
             subscribeForlastScanPropertyEvent(devicePath);
 
+        const gchar *ipv4ConfigPath = NULL;
+        const gchar *ipv6ConfigPath = NULL;
         GVariant *ip4_config = g_dbus_proxy_get_cached_property(deviceProxy, "Ip4Config");
         if (ip4_config) {
-            const gchar *ip4_config_path = g_variant_get_string(ip4_config, NULL);
-            NMLOG_DEBUG("Monitoring ip4_config_path: %s", ip4_config_path);
-            //monitor_ip4(ip4_config_path);
+            ipv4ConfigPath = g_variant_get_string(ip4_config, NULL);
+            NMLOG_DEBUG("Monitoring ip4_config_path: %s", ipv4ConfigPath);
         }
 
         GVariant *ip6_config = g_dbus_proxy_get_cached_property(deviceProxy, "Ip6Config");
         if (ip6_config) {
-            const gchar *ip6_config_path = g_variant_get_string(ip6_config, NULL);
-            NMLOG_DEBUG("Monitoring ip6_config_path: %s", ip6_config_path);
+            ipv6ConfigPath = g_variant_get_string(ip6_config, NULL);
+            NMLOG_DEBUG("Monitoring ip6_config_path: %s", ipv6ConfigPath);
+        }
+
+        if(ipv4ConfigPath)
+        {
+            GDBusProxy *ipV4Proxy = _NetworkManagerEvents->eventDbus.getNetworkManagerIpv4Proxy(ipv4ConfigPath);
+            g_signal_connect(ipV4Proxy, "g-properties-changed", G_CALLBACK(addressChangeCb), NULL);
+        }
+
+        if(ipv6ConfigPath)
+        {
+            GDBusProxy *ipV6Proxy = _NetworkManagerEvents->eventDbus.getNetworkManagerIpv6Proxy(ipv6ConfigPath);
+            g_signal_connect(ipV6Proxy, "g-properties-changed", G_CALLBACK(addressChangeCb), NULL);
         }
     }
 
@@ -509,13 +553,58 @@ namespace WPEFramework
         NMLOG_INFO("iface:%s - ipaddress:%s - %s - isIPv6:%s", iface.c_str(), ipAddress.c_str(), acqired?"acquired":"lost", isIPv6?"true":"false");
     }
 
-    void NetworkManagerEvents::onAvailableSSIDsCb(void *wifiDevice, GParamSpec *pspec, gpointer userData)
+    void NetworkManagerEvents::onAvailableSSIDsCb(const char* wifiDevicePath)
     {
-        NMLOG_DEBUG("wifi scanning completed ...");
-
-        if(_NetworkManagerEvents->doScanNotify) {
-            _NetworkManagerEvents->doScanNotify = false;
+        if(_NetworkManagerEvents->doScanNotify == false) {
+           return;
         }
+
+        NMLOG_INFO("wifi scanning completed ...");
+        //_NetworkManagerEvents->doScanNotify = false;
+        GDBusProxy* wProxy = nullptr;
+        GError* error = nullptr;
+        wProxy = _NetworkManagerEvents->eventDbus.getNetworkManagerWirelessProxy(wifiDevicePath);
+
+        if(wProxy == NULL)
+            return;
+        GVariant* result = g_dbus_proxy_call_sync(wProxy, "GetAllAccessPoints", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+        if (error) {
+            NMLOG_ERROR("Error creating proxy: %s", error->message);
+            g_error_free(error);
+            g_object_unref(wProxy);
+            return;
+        }
+
+        GVariantIter* iter;
+        const gchar* apPath;
+        JsonArray ssidList = JsonArray();
+        bool oneSSIDFound = false;
+
+        g_variant_get(result, "(ao)", &iter);
+        while (g_variant_iter_loop(iter, "o", &apPath)) {
+            Exchange::INetworkManager::WiFiSSIDInfo wifiInfo;
+            // NMLOG_DEBUG("Access Point Path: %s", apPath);
+            if(GnomeUtils::getApDetails(_NetworkManagerEvents->eventDbus.getConnection(), apPath, wifiInfo))
+            {
+                JsonObject ssidObj;
+                if(GnomeUtils::convertSsidInfoToJsonObject(wifiInfo, ssidObj))
+                {
+                    ssidList.Add(ssidObj);
+                    oneSSIDFound = true;
+                }
+            }
+
+        }
+
+        if(oneSSIDFound) {
+            std::string ssids;
+            ssidList.ToString(ssids);
+            NMLOG_DEBUG("scanned ssids: %s", ssids.c_str());
+        }
+
+        g_variant_iter_free(iter);
+        g_variant_unref(result);
+        g_object_unref(wProxy);
     }
 
     void NetworkManagerEvents::setwifiScanOptions(bool doNotify)

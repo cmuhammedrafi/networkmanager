@@ -51,7 +51,7 @@ namespace WPEFramework
         static void onInterfaceStateChangeCb(Exchange::INetworkManager::InterfaceState newState, std::string iface); // ReportInterfaceStateChangedEvent
         static void onAddressChangeCb(std::string iface, std::string ipAddress, bool acqired, bool isIPv6); // ReportIPAddressChangedEvent
         static void onActiveInterfaceChangeCb(std::string newInterface); // ReportActiveInterfaceChangedEvent
-        static void onAvailableSSIDsCb(void *wifiDevice, GParamSpec *pspec, gpointer userData); // ReportAvailableSSIDsEvent
+        static void onAvailableSSIDsCb(const char* wifiDevicePath); // ReportAvailableSSIDsEvent
         static void onWIFIStateChanged(Exchange::INetworkManager::WiFiState state, std::string& wifiStateStr); // ReportWiFiStateChangedEvent
 
     public:
@@ -65,7 +65,7 @@ namespace WPEFramework
         NetworkManagerEvents();
         ~NetworkManagerEvents();
         std::atomic<bool>isEventThrdActive = {false};
-        std::atomic<bool>doScanNotify = {false};
+        std::atomic<bool>doScanNotify = {true};
         NMEvents nmEvents;
         GThread *eventThrdID;
     public:

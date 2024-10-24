@@ -70,11 +70,11 @@ int main() {
     int choice = -1;
 
     while (choice != 0) {
-       // displayMenu();
-        std::cout << "Enter your choice: ";
+        displayMenu();
+        std::cout << "Enter your choice: \n";
         std::cin >> choice;
 
-       /* switch (choice) {
+        switch (choice) {
             case 1: {
                 std::list<std::string> ssids;
                 if (nmClient->getKnownSSIDs(ssids)) {
@@ -213,7 +213,7 @@ int main() {
             default:
                 std::cout << "Invalid choice, please try again." << std::endl;
                 break;
-            }*/
+            }
     }
 
     NMLOG_INFO("Program completed successfully");

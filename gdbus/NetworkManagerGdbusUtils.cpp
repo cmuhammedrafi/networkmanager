@@ -375,7 +375,7 @@ namespace WPEFramework
                 ret = true;
             }
             else {
-                NMLOG_WARNING("Invalid/hidden SSID: %zu (maximum is 32)", ssid_length);
+                NMLOG_DEBUG("Invalid/hidden SSID: %zu (maximum is 32)", ssid_length);
                 ret = false;
             }
 

@@ -185,6 +185,48 @@ namespace WPEFramework
             return proxy;
         }
 
+        GDBusProxy* DbusMgr::getNetworkManagerIpv4Proxy(const char* ipConfigPath)
+        {
+            GError* error = nullptr;
+            GDBusProxy* proxy = g_dbus_proxy_new_sync(
+                getConnection(), flags, nullptr, "org.freedesktop.NetworkManager",
+                ipConfigPath,
+                "org.freedesktop.NetworkManager.IP4Config",
+                nullptr,
+                &error
+            );
+
+            if (error != NULL) {
+                g_dbus_error_strip_remote_error(error);
+                NMLOG_FATAL("Error creating proxy: %s", error->message);
+                g_clear_error(&error);
+                return nullptr;
+            }
+
+            return proxy;
+        }
+
+        GDBusProxy* DbusMgr::getNetworkManagerIpv6Proxy(const char* ipConfigPath)
+        {
+            GError* error = nullptr;
+            GDBusProxy* proxy = g_dbus_proxy_new_sync(
+                getConnection(), flags, nullptr, "org.freedesktop.NetworkManager",
+                ipConfigPath,
+                "org.freedesktop.NetworkManager.IP6Config",
+                nullptr,
+                &error
+            );
+
+            if (error != NULL) {
+                g_dbus_error_strip_remote_error(error);
+                NMLOG_FATAL("Error creating proxy: %s", error->message);
+                g_clear_error(&error);
+                return nullptr;
+            }
+
+            return proxy;
+        }
+
     } // Plugin
 } // WPEFramework
 
