@@ -150,10 +150,102 @@ namespace WPEFramework
         const char* GnomeUtils::getWifiIfname() { return ifnameWlan; }
         const char* GnomeUtils::getEthIfname() { return ifnameEth; }
 
+        static std::string getSecurityModeString(guint32 flag, guint32 wpaFlags, guint32 rsnFlags)
+        {
+            std::string securityStr = "[AP type: ";
+            if (flag == NM_802_11_AP_FLAGS_NONE)
+                securityStr += "NONE ";
+            else
+            {
+                if ((flag & NM_802_11_AP_FLAGS_PRIVACY) != 0)
+                    securityStr += "PRIVACY ";
+                if ((flag & NM_802_11_AP_FLAGS_WPS) != 0)
+                    securityStr += "WPS ";
+                if ((flag & NM_802_11_AP_FLAGS_WPS_PBC) != 0)
+                    securityStr += "WPS_PBC ";
+                if ((flag & NM_802_11_AP_FLAGS_WPS_PIN) != 0)
+                    securityStr += "WPS_PIN ";
+            }
+            securityStr += "] ";
+
+            if (!(flag & NM_802_11_AP_FLAGS_PRIVACY) && (wpaFlags != NM_802_11_AP_SEC_NONE) && (rsnFlags != NM_802_11_AP_SEC_NONE))
+                securityStr += ("Encrypted: ");
+
+            if ((flag & NM_802_11_AP_FLAGS_PRIVACY) && (wpaFlags == NM_802_11_AP_SEC_NONE)
+                && (rsnFlags == NM_802_11_AP_SEC_NONE))
+                securityStr += ("WEP ");
+            if (wpaFlags != NM_802_11_AP_SEC_NONE)
+                securityStr += ("WPA ");
+            if ((rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_PSK)
+                || (rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_802_1X)) {
+                securityStr += ("WPA2 ");
+            }
+            if (rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_SAE) {
+                securityStr += ("WPA3 ");
+            }
+            if ((rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_OWE)
+                || (rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_OWE_TM)) {
+                securityStr += ("OWE ");
+            }
+            if ((wpaFlags & NM_802_11_AP_SEC_KEY_MGMT_802_1X)
+                || (rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_802_1X)) {
+                securityStr += ("802.1X ");
+            }
+
+            if (securityStr.empty())
+            {
+                securityStr = "None";
+                return securityStr;
+            }
+
+            uint32_t flags[2] = { wpaFlags, rsnFlags };
+            securityStr += "[WPA: ";
+            
+            for (int i = 0; i < 2; ++i)
+            {
+                if (flags[i] & NM_802_11_AP_SEC_PAIR_WEP40)
+                    securityStr += "pair_wep40 ";
+                if (flags[i] & NM_802_11_AP_SEC_PAIR_WEP104)
+                    securityStr += "pair_wep104 ";
+                if (flags[i] & NM_802_11_AP_SEC_PAIR_TKIP)
+                    securityStr += "pair_tkip ";
+                if (flags[i] & NM_802_11_AP_SEC_PAIR_CCMP)
+                    securityStr += "pair_ccmp ";
+                if (flags[i] & NM_802_11_AP_SEC_GROUP_WEP40)
+                    securityStr += "group_wep40 ";
+                if (flags[i] & NM_802_11_AP_SEC_GROUP_WEP104)
+                    securityStr += "group_wep104 ";
+                if (flags[i] & NM_802_11_AP_SEC_GROUP_TKIP)
+                    securityStr += "group_tkip ";
+                if (flags[i] & NM_802_11_AP_SEC_GROUP_CCMP)
+                    securityStr += "group_ccmp ";
+                if (flags[i] & NM_802_11_AP_SEC_KEY_MGMT_PSK)
+                    securityStr += "psk ";
+                if (flags[i] & NM_802_11_AP_SEC_KEY_MGMT_802_1X)
+                    securityStr += "802.1X ";
+                if (flags[i] & NM_802_11_AP_SEC_KEY_MGMT_SAE)
+                    securityStr += "sae ";
+                if (flags[i] & NM_802_11_AP_SEC_KEY_MGMT_OWE)
+                    securityStr += "owe ";
+                if (flags[i] & NM_802_11_AP_SEC_KEY_MGMT_OWE_TM)
+                    securityStr += "owe_transition_mode ";
+                if (flags[i] & NM_802_11_AP_SEC_KEY_MGMT_EAP_SUITE_B_192)
+                    securityStr += "wpa-eap-suite-b-192 ";
+                
+                if (i == 0) {
+                    securityStr += "] [RSN: ";
+                }
+            }
+            securityStr +="] ";
+            return securityStr;
+        }
+
         uint8_t GnomeUtils::wifiSecurityModeFromApFlags(const std::string& ssid, guint32 flags, guint32 wpaFlags, guint32 rsnFlags)
         {
             uint8_t security = Exchange::INetworkManager::WIFI_SECURITY_NONE;
-            if ((flags == NM_802_11_AP_FLAGS_NONE) && (wpaFlags == NM_802_11_AP_SEC_NONE) && (rsnFlags == NM_802_11_AP_SEC_NONE))
+            NMLOG_INFO("ap [%s] security str %s", ssid.c_str(), getSecurityModeString(flags, wpaFlags, rsnFlags).c_str());
+
+            if ((flags != NM_802_11_AP_FLAGS_PRIVACY) && (wpaFlags == NM_802_11_AP_SEC_NONE) && (rsnFlags == NM_802_11_AP_SEC_NONE))
                 security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_NONE;
             else if (rsnFlags & NM_802_11_AP_SEC_KEY_MGMT_SAE)
                 security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_SAE;
@@ -162,7 +254,6 @@ namespace WPEFramework
             else
                 security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK;
 
-            //NMLOG_INFO("ap [%s] security str %s", ssid.c_str(), nmUtils::getSecurityModeString(flags, wpaFlags, rsnFlags).c_str());
             return security;
         }
 
@@ -272,7 +363,7 @@ namespace WPEFramework
             if(nmProxy == NULL)
                 return false;
 
-            devicesVar = g_dbus_proxy_call_sync(nmProxy, "GetDevices", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+            devicesVar = g_dbus_proxy_call_sync(nmProxy, "GetDevices", NULL, G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, NULL, &error);
             if (error) {
                 NMLOG_ERROR("Error calling GetDevices method: %s", error->message);
                 g_error_free(error);
@@ -319,7 +410,7 @@ namespace WPEFramework
                     "GetDeviceByIpIface",
                     g_variant_new("(s)", ifaceName),
                     G_DBUS_CALL_FLAGS_NONE,
-                    -1,
+                    GDBUS_DEFAULT_TIMEOUT_MS,
                     nullptr,
                     &error);
 
@@ -509,7 +600,7 @@ namespace WPEFramework
                                         "ListConnections",
                                         NULL,
                                         G_DBUS_CALL_FLAGS_NONE,
-                                        -1,
+                                        GDBUS_DEFAULT_TIMEOUT_MS,
                                         NULL,
                                         &error);
             if(listProxy == NULL)
@@ -559,7 +650,7 @@ namespace WPEFramework
                     "ActivateConnection",
                     g_variant_new("(ooo)", connectionProfile.c_str(), devicePath.c_str(), "/"),
                     G_DBUS_CALL_FLAGS_NONE,
-                    -1,
+                    GDBUS_DEFAULT_TIMEOUT_MS,
                     nullptr,
                     &error
                     );

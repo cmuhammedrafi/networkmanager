@@ -56,7 +56,7 @@ namespace WPEFramework
                 bool setIPSettings(const std::string& interface, const Exchange::INetworkManager::IPAddress& address);
                 bool getPrimaryInterface(std::string& interface);
                 bool getInterfaceState(const std::string& interface, bool& isEnabled);
-                bool getIPSettings(const std::string& interface, const std::string& ipversion, Exchange::INetworkManager::IPAddress& result);
+                bool getIPSettings(std::string &interface, const std::string &ipversion, Exchange::INetworkManager::IPAddress& result);
                 bool getKnownSSIDs(std::list<std::string>& ssids);
                 bool getConnectedSSID(Exchange::INetworkManager::WiFiSSIDInfo& ssidinfo);
                 bool addToKnownSSIDs(const Exchange::INetworkManager::WiFiConnectTo& ssidinfo);
@@ -65,6 +65,7 @@ namespace WPEFramework
                 bool wifiConnect(const Exchange::INetworkManager::WiFiConnectTo& connectInfo, bool iswpsAP = false);
                 bool wifiDisconnect();
                 bool getWifiState(Exchange::INetworkManager::WiFiState &state);
+                bool getDeviceState(const char* iface, NMDeviceState &state);
                 bool getWiFiSignalQuality(std::string& ssid, std::string& signalStrength, Exchange::INetworkManager::WiFiSignalQuality& quality);
                 bool startWPS();
                 bool stopWPS();

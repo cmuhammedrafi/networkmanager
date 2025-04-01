@@ -279,9 +279,17 @@ namespace WPEFramework
                     case NM_DEVICE_STATE_CONFIG:
                         wifiState = "WIFI_STATE_CONNECTING";
                         NetworkManagerEvents::onWIFIStateChanged(Exchange::INetworkManager::WIFI_STATE_CONNECTING, wifiState);
+                        break;
+                    case NM_DEVICE_STATE_IP_CONFIG:
+                        wifiState = "NM_DEVICE_STATE_IP_CONFIG";
                         NetworkManagerEvents::onInterfaceStateChangeCb(Exchange::INetworkManager::INTERFACE_LINK_UP, GnomeUtils::getWifiIfname());
                         break;
                     case NM_DEVICE_STATE_IP_CHECK:
+                        wifiState = "NM_DEVICE_STATE_IP_CHECK";
+                        //NetworkManagerEvents::onInterfaceStateChangeCb(Exchange::INetworkManager::INTERFACE_ACQUIRING_IP, GnomeUtils::getWifiIfname());
+                        break;
+                    case NM_DEVICE_STATE_SECONDARIES:
+                        wifiState = "NM_DEVICE_STATE_SECONDARIES";
                         NetworkManagerEvents::onInterfaceStateChangeCb(Exchange::INetworkManager::INTERFACE_ACQUIRING_IP, GnomeUtils::getWifiIfname());
                         break;
                     case NM_DEVICE_STATE_ACTIVATED:
@@ -735,7 +743,7 @@ namespace WPEFramework
         if(wProxy == NULL)
             return;
 
-        GVariant* result = g_dbus_proxy_call_sync(wProxy, "GetAllAccessPoints", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+        GVariant* result = g_dbus_proxy_call_sync(wProxy, "GetAllAccessPoints", NULL, G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, NULL, &error);
         if (error) {
             NMLOG_ERROR("Error creating proxy: %s", error->message);
             g_error_free(error);

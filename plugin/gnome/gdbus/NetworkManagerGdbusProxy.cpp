@@ -20,6 +20,7 @@
 #include "NetworkManagerImplementation.h"
 #include "NetworkManagerGdbusClient.h"
 #include "NetworkManagerGdbusEvent.h"
+#include "NetworkManagerGdbusUtils.h"
 
 using namespace WPEFramework;
 using namespace WPEFramework::Plugin;
@@ -85,6 +86,20 @@ namespace WPEFramework
             ::_instance = this;
             _nmGdbusClient = NetworkManagerClient::getInstance();
             _nmGdbusEvents = NetworkManagerEvents::getInstance();
+            //TODO replace nmUtils::getInterfacesName(); // get interface name form '/etc/device.proprties'
+
+            NMDeviceState devState = NM_DEVICE_STATE_UNKNOWN;
+            if(_nmGdbusClient->getDeviceState(GnomeUtils::getEthIfname(), devState))
+            {
+                if(devState > NM_DEVICE_STATE_DISCONNECTED && devState < NM_DEVICE_STATE_DEACTIVATING)
+                    m_defaultInterface = GnomeUtils::getEthIfname();
+                else
+                    m_defaultInterface = GnomeUtils::getWifiIfname(); // if ethernet not connected will take wifi as default
+            }
+            else
+                NMLOG_ERROR("Failed to get device state for %s", GnomeUtils::getEthIfname());
+
+            NMLOG_INFO("default interface is %s",  m_defaultInterface.c_str());
             getInitialConnectionState();
         }
 

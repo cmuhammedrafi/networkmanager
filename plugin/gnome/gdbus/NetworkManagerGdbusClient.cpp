@@ -34,6 +34,8 @@ namespace WPEFramework
     namespace Plugin
     {
 
+        extern NetworkManagerImplementation* _instance;
+
         NetworkManagerClient::NetworkManagerClient() {
             NMLOG_INFO("NetworkManagerClient");
         }
@@ -60,7 +62,7 @@ namespace WPEFramework
                     "GetSettings",
                     nullptr,
                     G_DBUS_CALL_FLAGS_NONE,
-                    -1,
+                    GDBUS_DEFAULT_TIMEOUT_MS,
                     nullptr,
                     &error);
 
@@ -189,7 +191,7 @@ namespace WPEFramework
                     "Update",
                     g_variant_new("(a{sa{sv}})", &settingsBuilder),
                     G_DBUS_CALL_FLAGS_NONE,
-                    -1,
+                    GDBUS_DEFAULT_TIMEOUT_MS,
                     nullptr,
                     &error);
 
@@ -230,7 +232,7 @@ namespace WPEFramework
                     "GetSettings",
                     nullptr,
                     G_DBUS_CALL_FLAGS_NONE,
-                    -1,
+                    GDBUS_DEFAULT_TIMEOUT_MS,
                     nullptr,
                     &error);
 
@@ -407,7 +409,7 @@ namespace WPEFramework
                     "Update",
                     g_variant_new("(a{sa{sv}})", &settingsBuilder),
                     G_DBUS_CALL_FLAGS_NONE,
-                    -1,
+                    GDBUS_DEFAULT_TIMEOUT_MS,
                     nullptr,
                     &error);
 
@@ -555,7 +557,7 @@ namespace WPEFramework
                     "Get",
                     g_variant_new("(ss)", "org.freedesktop.NetworkManager", "PrimaryConnection"),
                     G_DBUS_CALL_FLAGS_NONE,
-                    -1,
+                    GDBUS_DEFAULT_TIMEOUT_MS,
                     nullptr,
                     &error
                     );
@@ -589,7 +591,7 @@ namespace WPEFramework
                     "Get",
                     g_variant_new("(ss)", "org.freedesktop.NetworkManager.Connection.Active", "Devices"),
                     G_DBUS_CALL_FLAGS_NONE,
-                    -1,
+                    GDBUS_DEFAULT_TIMEOUT_MS,
                     nullptr,
                     &error
             );
@@ -628,7 +630,7 @@ namespace WPEFramework
                     "Get",
                     g_variant_new("(ss)", "org.freedesktop.NetworkManager.Device", "Interface"),
                     G_DBUS_CALL_FLAGS_NONE,
-                    -1,
+                    GDBUS_DEFAULT_TIMEOUT_MS,
                     nullptr,
                     &error
                     );
@@ -673,7 +675,7 @@ namespace WPEFramework
                     "Set",
                     g_variant_new("(ssv)", "org.freedesktop.NetworkManager.Device", "Managed", g_variant_new_boolean(enable)),
                     G_DBUS_CALL_FLAGS_NONE,
-                    -1,
+                    GDBUS_DEFAULT_TIMEOUT_MS,
                     nullptr,
                     &error
                     );
@@ -708,7 +710,7 @@ namespace WPEFramework
                     "Get",
                     g_variant_new("(ss)", "org.freedesktop.NetworkManager.Device", "Managed"),
                     G_DBUS_CALL_FLAGS_NONE,
-                    -1,
+                    GDBUS_DEFAULT_TIMEOUT_MS,
                     nullptr,
                     &error
                     );
@@ -753,7 +755,7 @@ namespace WPEFramework
             return true;
         }
 
-        bool NetworkManagerClient::getIPSettings(const std::string& interface, const std::string& ipversion, Exchange::INetworkManager::IPAddress& result)
+        bool NetworkManagerClient::getIPSettings(std::string& interface, const std::string& ipversion, Exchange::INetworkManager::IPAddress& result)
         {
             std::string devicePath;
             std::string addressStr;
@@ -772,6 +774,13 @@ namespace WPEFramework
             const gchar *IPv6Method = nullptr;
             deviceInfo devInfo{};
             GError *error = nullptr;
+
+            if(interface.empty())
+            {
+                if(getPrimaryInterface(interface))
+                    return false;
+            }
+
             if(!GnomeUtils::getDeviceByIpIface(m_dbus, interface.c_str(), devicePath))
                 return false;
             GDBusProxy *deviceProxy = m_dbus.getNetworkManagerDeviceProxy(devicePath.c_str());
@@ -1091,7 +1100,7 @@ namespace WPEFramework
                     "GetSettings",
                     nullptr,
                     G_DBUS_CALL_FLAGS_NONE,
-                    -1,
+                    GDBUS_DEFAULT_TIMEOUT_MS,
                     nullptr,
                     &error);
 
@@ -1172,7 +1181,7 @@ namespace WPEFramework
             if(ConnProxy == NULL)
                 return false;
         
-            settingsProxy = g_dbus_proxy_call_sync(ConnProxy, "GetSettings", NULL, G_DBUS_CALL_FLAGS_NONE, -1,  NULL, &error);
+            settingsProxy = g_dbus_proxy_call_sync(ConnProxy, "GetSettings", NULL, G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS,  NULL, &error);
             if (!settingsProxy) {
                 g_dbus_error_strip_remote_error(error);
                 NMLOG_ERROR("Failed to get connection settings: %s", error->message);
@@ -1270,7 +1279,7 @@ namespace WPEFramework
             if(ConnProxy == NULL)
                 return false;
 
-            deleteVar = g_dbus_proxy_call_sync(ConnProxy, "Delete", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+            deleteVar = g_dbus_proxy_call_sync(ConnProxy, "Delete", NULL, G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, NULL, &error);
             if (!deleteVar) {
                 g_dbus_error_strip_remote_error(error);
                 NMLOG_ERROR("Failed to get connection settings: %s", error->message);
@@ -1323,9 +1332,9 @@ namespace WPEFramework
             if(!GnomeUtils::getDeviceInfoByIfname(m_dbus, GnomeUtils::getWifiIfname(), devInfo))
                 return false;
 
-            if(devInfo.path.empty() || devInfo.state < NM_DEVICE_STATE_DISCONNECTED)
+            if(devInfo.path.empty() || devInfo.state < NM_DEVICE_STATE_DISCONNECTED && devInfo.state >= NM_DEVICE_STATE_IP_CONFIG)
             {
-                NMLOG_ERROR("access point state not valid %d", devInfo.state);
+                NMLOG_WARNING("access point state not valid %d", devInfo.state);
                 return false;
             }
 
@@ -1381,7 +1390,7 @@ namespace WPEFramework
             if (wProxy == NULL)
                 return false;
 
-            GVariant* result = g_dbus_proxy_call_sync(wProxy, "GetAllAccessPoints", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+            GVariant* result = g_dbus_proxy_call_sync(wProxy, "GetAllAccessPoints", NULL, G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, NULL, &error);
             if (error) {
                 NMLOG_ERROR("Error creating proxy: %s", error->message);
                 g_error_free(error);
@@ -1464,12 +1473,12 @@ namespace WPEFramework
                 g_variant_builder_init(&builder, G_VARIANT_TYPE("a{sv}"));
                 g_variant_builder_add(&builder, "{sv}", "ssids", g_variant_builder_end(&ssidArray));
                 g_dbus_proxy_call_sync(wProxy, "RequestScan", g_variant_new("(a{sv})", builder),
-                                             G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+                                             G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, NULL, &error);
             }
 
             else {
                 g_dbus_proxy_call_sync(wProxy, "RequestScan", g_variant_new("(a{sv})", NULL),
-                                            G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+                                            G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, NULL, &error);
             }
 
             if (error)
@@ -1496,7 +1505,7 @@ namespace WPEFramework
 
             result = g_dbus_proxy_call_sync (proxy, "Update",
                 g_variant_new("(a{sa{sv}})", connBuilder),
-                G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
+                G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, nullptr, &error);
 
             if (error) {
                 NMLOG_ERROR("Failed to call Update : %s", error->message);
@@ -1522,7 +1531,7 @@ namespace WPEFramework
 
             result = g_dbus_proxy_call_sync (proxy, "ActivateConnection",
                 g_variant_new("(ooo)", connPath, devicePath, specificObject),
-                G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
+                G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, nullptr, &error);
 
             if (error) {
                 NMLOG_ERROR("Failed to call ActivateConnection: %s", error->message);
@@ -1586,7 +1595,7 @@ namespace WPEFramework
             NMLOG_DEBUG("devicePath %s, specificObject %s", devicePath, specificObject);
             result = g_dbus_proxy_call_sync (proxy, "AddAndActivateConnection2",
                 g_variant_new("(@a{sa{sv}}oo@a{sv})", connBuilderVariant, devicePath?: "/", specificObject?: "/", optionBuilderVariant),
-                G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
+                G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, nullptr, &error);
 
             if (result == NULL) {
                 if(error != NULL)
@@ -1786,7 +1795,7 @@ namespace WPEFramework
                 {
                     result = g_dbus_proxy_call_sync (proxy, "Update",
                                 g_variant_new("(a{sa{sv}})", connBuilder),
-                                G_DBUS_CALL_FLAGS_NONE, -1, nullptr, &error);
+                                G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, nullptr, &error);
 
                     if (error == nullptr) {
                         NMLOG_DEBUG("same connection updated success : %s", exsistingConn.c_str());
@@ -1808,7 +1817,7 @@ namespace WPEFramework
                 if (proxy != nullptr)
                 {
                     result = g_dbus_proxy_call_sync (proxy, "AddConnection",
-                                g_variant_new ("(a{sa{sv}})", &connBuilder), G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+                                g_variant_new ("(a{sa{sv}})", &connBuilder), G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, NULL, &error);
 
                     if (error != nullptr) {
                         g_dbus_error_strip_remote_error (error);
@@ -1919,6 +1928,15 @@ namespace WPEFramework
                 NMLOG_INFO("strength success %s dBm", signalStrength.c_str());
             }
 
+            return true;
+        }
+
+        bool NetworkManagerClient::getDeviceState(const char* iface, NMDeviceState &state)
+        {
+            deviceInfo deviceProp;
+            if(GnomeUtils::getDeviceInfoByIfname(m_dbus, iface, deviceProp))
+                return false;
+            state = deviceProp.state;
             return true;
         }
 
@@ -2059,7 +2077,7 @@ namespace WPEFramework
             if(wProxy == NULL)
                 return false;
             else
-            g_dbus_proxy_call_sync(wProxy, "Disconnect", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+            g_dbus_proxy_call_sync(wProxy, "Disconnect", NULL, G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, NULL, &error);
                 return true;
             if (error) {
                 NMLOG_ERROR("Error calling Disconnect method: %s", error->message);
@@ -2146,7 +2164,7 @@ namespace WPEFramework
             if (wProxy == NULL)
                 return false;
 
-            GVariant* result = g_dbus_proxy_call_sync(wProxy, "GetAllAccessPoints", NULL, G_DBUS_CALL_FLAGS_NONE, -1, NULL, &error);
+            GVariant* result = g_dbus_proxy_call_sync(wProxy, "GetAllAccessPoints", NULL, G_DBUS_CALL_FLAGS_NONE, GDBUS_DEFAULT_TIMEOUT_MS, NULL, &error);
             if (error) {
                 NMLOG_ERROR("Error creating proxy: %s", error->message);
                 g_error_free(error);
@@ -2184,6 +2202,7 @@ namespace WPEFramework
             m_wpsProcessRun = true;
             Exchange::INetworkManager::WiFiConnectTo ssidinfo{};
             Exchange::INetworkManager::WiFiState state;
+            bool wpsComplete = false;
             NMLOG_INFO("WPS process started !");
 
             if(!getWifiState(state))
@@ -2193,13 +2212,24 @@ namespace WPEFramework
                 return;
             }
 
+            if(_instance != nullptr)
+                _instance->ReportWiFiStateChange(Exchange::INetworkManager::WIFI_STATE_CONNECTING);
+
             for(int retry =0; retry < GDBUS_WPS_RETRY_COUNT; retry++)
             {
                 if(m_wpsProcessRun.load() == false) // stop wps process if reuested
+                {
+                    NMLOG_INFO("stop wps process reuested");
                     break;
+                }
                 sleep(GDBUS_WPS_RETRY_WAIT_IN_MS);
-                if(m_wpsProcessRun.load() == false)
+
+                if(m_wpsProcessRun.load() == false) // stop wps process if reuested
+                {
+                    NMLOG_INFO("stop wps process reuested");
                     break;
+                }
+
                 if(!findWpsPbcSSID(m_dbus, ssidinfo.ssid))
                 {
                     startWifiScan();
@@ -2211,7 +2241,7 @@ namespace WPEFramework
                 {
                     NMLOG_ERROR("wifi state error ! wps process stoped !");
                     m_wpsProcessRun = false;
-                    return;
+                    break;
                 }
 
                 if(Exchange::INetworkManager::WiFiState::WIFI_STATE_DISCONNECTED != state)
@@ -2223,8 +2253,15 @@ namespace WPEFramework
                 ssidinfo.security = Exchange::INetworkManager::WIFISecurityMode::WIFI_SECURITY_WPA_PSK;
                 ssidinfo.persist = true;
                 /* security mode will be updated in wifi connect function, if not mathing to wpa-psk */
-                wifiConnect(ssidinfo, true); // isWps = true
+                wpsComplete = wifiConnect(ssidinfo, true); // isWps = true
                 break;
+            }
+
+            if(!wpsComplete)
+            {
+                NMLOG_ERROR("WPS process failed");
+                if(_instance != nullptr)
+                    _instance->ReportWiFiStateChange(Exchange::INetworkManager::WIFI_STATE_SSID_NOT_FOUND);
             }
 
             NMLOG_INFO("wps process complete !!");
