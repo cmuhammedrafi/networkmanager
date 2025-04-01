@@ -755,7 +755,7 @@ namespace WPEFramework
             return true;
         }
 
-        bool NetworkManagerClient::getIPSettings(std::string& interface, const std::string& ipversion, Exchange::INetworkManager::IPAddress& result)
+        bool NetworkManagerClient::getIPSettings(const std::string& interface, const std::string& ipversion, Exchange::INetworkManager::IPAddress& result)
         {
             std::string devicePath;
             std::string addressStr;
@@ -774,12 +774,6 @@ namespace WPEFramework
             const gchar *IPv6Method = nullptr;
             deviceInfo devInfo{};
             GError *error = nullptr;
-
-            if(interface.empty())
-            {
-                if(getPrimaryInterface(interface))
-                    return false;
-            }
 
             if(!GnomeUtils::getDeviceByIpIface(m_dbus, interface.c_str(), devicePath))
                 return false;
