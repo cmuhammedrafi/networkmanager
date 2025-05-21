@@ -7,7 +7,7 @@ on:
     branches: [ main, develop, 'release/**', 'hotfix/**', 'feature/**'] 
 
 env:
-  THUNDER_REF: "R4.4.1"
+  THUNDER_REF: "R4.4.3"
 
 jobs:
   unit-tests:
@@ -35,7 +35,7 @@ jobs:
         run: |
           git clone https://github.com/rdkcentral/ThunderTools ThunderTools --branch ${{ env.THUNDER_REF }}
           git clone https://github.com/rdkcentral/Thunder Thunder --branch ${{ env.THUNDER_REF }}
-         
+
       - name: Build ThunderTools
         run: >
           cmake
@@ -45,6 +45,15 @@ jobs:
           -DGENERIC_CMAKE_MODULE_PATH="${{github.workspace}}/install/tools/cmake"
           &&
           cmake --build build/ThunderTools --target install -j8
+
+      - name: Checkout networkmanager
+        uses: actions/checkout@v3
+        with:
+          path: networkmanager
+      - name: Apply Thunder Patches
+        run: |
+          cd ${{github.workspace}}/Thunder
+          git apply ${{github.workspace}}/networkmanager/tests/patches/thunder/Remove-SmartLinkType.patch
 
       - name: Build Thunder
         run: >
@@ -58,10 +67,19 @@ jobs:
           &&
           cmake --build build/Thunder --target install -j8
 
-      - name: Checkout networkmanager
-        uses: actions/checkout@v3
-        with:
-          path: networkmanager
+      - name: Build networkmanager with Gnome GDBUS Proxy
+        run: >
+          cmake
+          -S "${{github.workspace}}/networkmanager"
+          -B build/GnomeGdbusNetworkmanager
+          -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
+          -DCMAKE_INSTALL_PREFIX="${{github.workspace}}/install/usr"
+          -DCMAKE_MODULE_PATH="${{github.workspace}}/install/tools/cmake"
+          -DENABLE_GNOME_NETWORKMANAGER=ON
+          -DENABLE_GNOME_GDBUS=ON
+          -DENABLE_PLUGIN_CLI=ON
+          &&
+          cmake --build build/GnomeGdbusNetworkmanager --target install -j8
 
       - name: Build networkmanager with Gnome libnm Proxy
         run: >
@@ -71,25 +89,24 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
           -DCMAKE_INSTALL_PREFIX="${{github.workspace}}/install/usr"
           -DCMAKE_MODULE_PATH="${{github.workspace}}/install/tools/cmake"
-          -DCMAKE_CXX_FLAGS=" -fprofile-arcs -ftest-coverage "
+          -DCMAKE_CXX_FLAGS=" --coverage "
           -DENABLE_GNOME_NETWORKMANAGER=ON
           -DENABLE_PLUGIN_CLI=ON
           &&
           cmake --build build/GnomeLibnmNetworkmanager --target install -j8
 
-      - name: Build networkmanager with Gnome GDBUS Proxy
-        run: >
-          cmake
-          -S "${{github.workspace}}/networkmanager"
-          -B build/GnomeGdbusNetworkmanager
-          -DCMAKE_TOOLCHAIN_FILE="${{ env.TOOLCHAIN_FILE }}"
-          -DCMAKE_INSTALL_PREFIX="${{github.workspace}}/install/usr"
-          -DCMAKE_MODULE_PATH="${{github.workspace}}/install/tools/cmake"
-          -DCMAKE_CXX_FLAGS=" -fprofile-arcs -ftest-coverage "
-          -DENABLE_GNOME_NETWORKMANAGER=ON
-          -DENABLE_GNOME_GDBUS=ON
-          -DENABLE_PLUGIN_CLI=ON
-          &&
-          cmake --build build/GnomeGdbusNetworkmanager --target install -j8
+      - name: Run unit tests with thunder
+        run: |
+          export LD_LIBRARY_PATH=${PWD}/install/usr/lib:${LD_LIBRARY_PATH}
+          export PATH=${PWD}/install/usr/bin:${PATH}
+          echo "Starting WPEFramework..."
 
+          # Run WPEFramework in background in a new process group
+          setsid WPEFramework -f -c ${PWD}/install/etc/WPEFramework/config.json &
+          PID=$!
+          echo "WPEFramework PID: $PID"
+          # Wait for 5 minutes (300 seconds)
+          sleep 300
 
+          # Kill the whole process group (includes child processes)
+          kill -TERM -$(ps -o pgid= $PID | grep -o '[0-9]*') || true
