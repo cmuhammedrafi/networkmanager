@@ -106,15 +106,15 @@ jobs:
           PID=$!
           echo "WPEFramework PID: $PID"
 
-          sleep 60
+          sleep 30
 
           # Kill the whole process group (includes child processes)
           kill -TERM -$(ps -o pgid= $PID | grep -o '[0-9]*') || true
 
       - name: Generate gnome coverage
         run: |
-            lcov -c -o gnome_proxy_coverage.info -d build/RDKNetworkmanager
-            lcov -r coverage.info '/usr/include/*' '*/build/RDKNetworkmanager/*' \
+            lcov -c -o gnome_proxy_coverage.info -d build/GnomeLibnmNetworkmanager
+            lcov -r coverage.info '/usr/include/*' '*/build/GnomeLibnmNetworkmanager/*' \
                                   '*/install/usr/include/*' '*/tests/*' 'googlemock/*' 'googletest/*' \
                                   -o filtered_coverage.info
       - name: Generate the html report
