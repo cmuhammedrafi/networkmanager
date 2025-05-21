@@ -105,8 +105,25 @@ jobs:
           setsid WPEFramework -f -c ${PWD}/install/etc/WPEFramework/config.json &
           PID=$!
           echo "WPEFramework PID: $PID"
-          # Wait for 5 minutes (300 seconds)
-          sleep 300
+
+          sleep 60
 
           # Kill the whole process group (includes child processes)
           kill -TERM -$(ps -o pgid= $PID | grep -o '[0-9]*') || true
+
+      - name: Generate gnome coverage
+        run: |
+            lcov -c -o gnome_proxy_coverage.info -d build/RDKNetworkmanager
+            lcov -r coverage.info '/usr/include/*' '*/build/RDKNetworkmanager/*' \
+                                  '*/install/usr/include/*' '*/tests/*' 'googlemock/*' 'googletest/*' \
+                                  -o filtered_coverage.info
+      - name: Generate the html report
+        run: |
+            genhtml filtered_gnome_proxy_coverage.info --output-directory /tmp/gnome_coverage_report
+
+      - name: Upload the coverage report to Pull request using actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: /tmp/gnome_coverage_report
+
