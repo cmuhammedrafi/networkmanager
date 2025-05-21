@@ -114,9 +114,9 @@ jobs:
       - name: Generate gnome coverage
         run: |
             lcov -c -o gnome_proxy_coverage.info -d build/GnomeLibnmNetworkmanager
-            lcov -r coverage.info '/usr/include/*' '*/build/GnomeLibnmNetworkmanager/*' \
+            lcov -r gnome_proxy_coverage.info '/usr/include/*' '*/build/GnomeLibnmNetworkmanager/*' \
                                   '*/install/usr/include/*' '*/tests/*' 'googlemock/*' 'googletest/*' \
-                                  -o filtered_coverage.info
+                                  -o filtered_gnome_proxy_coverage.info
       - name: Generate the html report
         run: |
             genhtml filtered_gnome_proxy_coverage.info --output-directory /tmp/gnome_coverage_report
