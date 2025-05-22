@@ -105,6 +105,7 @@ set_target_properties(${NM_ROUTER_DISCOVERY_UT} PROPERTIES
     CXX_STANDARD_REQUIRED YES
 )
 
+
 target_compile_options(${NM_CLASS_UT} PRIVATE -Wall -include ${CMAKE_SOURCE_DIR}/interface/INetworkManager.h)
 target_compile_options(${NM_RDKPROXY_UT} PRIVATE -Wall -include ${CMAKE_SOURCE_DIR}/interface/INetworkManager.h)
 target_compile_options(${NM_LEGACY_WIFI_UT} PRIVATE -Wall -include ${CMAKE_SOURCE_DIR}/interface/INetworkManager.h)
