@@ -42,17 +42,6 @@ option(USE_RDK_LOGGER "Enable RDK Logger for logging" OFF )
 option(ENABLE_UNIT_TESTING "Enable unit tests" OFF)
 option(CODE_COVERAGE "Enable code coverage" OFF)
 
-if(CODE_COVERAGE)
-    message(STATUS "Code coverage enabled")
-
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        add_compile_options(--coverage -O0 -g)
-        add_link_options(--coverage)
-    else()
-        message(FATAL_ERROR "Code coverage only supported with GCC or Clang")
-    endif()
-endif()
-
 add_subdirectory(interface)
 add_subdirectory(definition)
 add_subdirectory(plugin)
