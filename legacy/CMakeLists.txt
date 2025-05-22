@@ -46,6 +46,11 @@ add_library(${PLUGIN_LEGACY_NETWORK} SHARED
         ../plugin/Module.cpp
 )
 
+if(CODE_COVERAGE)
+    target_compile_options(${PLUGIN_LEGACY_NETWORK} PRIVATE --coverage -O0 -g)
+    target_link_options(${PLUGIN_LEGACY_NETWORK} PRIVATE --coverage)
+endif()
+
 target_link_libraries(${PLUGIN_LEGACY_NETWORK}  PRIVATE ${NAMESPACE}Core::${NAMESPACE}Core ${NAMESPACE}Plugins::${NAMESPACE}Plugins)
 
 if (USE_RDK_LOGGER)
@@ -63,6 +68,11 @@ add_library(${PLUGIN_LEGACY_WIFI} SHARED
         ../plugin/NetworkManagerLogger.cpp
         ../plugin/Module.cpp
 )
+
+if(CODE_COVERAGE)
+    target_compile_options(${PLUGIN_LEGACY_WIFI} PRIVATE --coverage -O0 -g)
+    target_link_options(${PLUGIN_LEGACY_WIFI} PRIVATE --coverage)
+endif()
 
 target_link_libraries(${PLUGIN_LEGACY_WIFI}  PRIVATE ${NAMESPACE}Core::${NAMESPACE}Core ${NAMESPACE}Plugins::${NAMESPACE}Plugins)
 
