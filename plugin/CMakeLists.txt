@@ -81,6 +81,13 @@ add_library(${MODULE_IMPL_NAME} SHARED
                             Module.cpp
                             ${PROXY_STUB_SOURCES})
 
+if(CODE_COVERAGE)
+    target_compile_options(${MODULE_IMPL_NAME} PRIVATE --coverage -O0 -g)
+    target_link_options(${MODULE_IMPL_NAME} PRIVATE --coverage)
+    target_compile_options(${MODULE_NAME} PRIVATE --coverage -O0 -g)
+    target_link_options(${MODULE_NAME} PRIVATE --coverage)
+endif()
+
 if(ENABLE_GNOME_NETWORKMANAGER)
     if(ENABLE_GNOME_GDBUS)
         message("networkmanager building with gdbus")
