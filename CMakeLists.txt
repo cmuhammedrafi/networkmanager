@@ -54,6 +54,8 @@ add_subdirectory(tools)
 
 if(ENABLE_UNIT_TESTING)
     add_subdirectory(tests/unittest)
-    add_subdirectory(tests/functionaltest)
+    if(CODE_COVERAGE)
+        add_subdirectory(tests/functionaltest)
+    endif(CODE_COVERAGE)
 endif(ENABLE_UNIT_TESTING)
 

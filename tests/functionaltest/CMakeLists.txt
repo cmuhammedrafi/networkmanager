@@ -21,9 +21,12 @@ message ("functional l3 test binary buidlt here")
 set(functional_l3_tests "functional_l3_tests")
 
 find_package(${NAMESPACE}Core REQUIRED)
+find_package(PkgConfig REQUIRED)
+find_package(WPEFrameworkWebSocket REQUIRED)
 
 add_executable(${functional_l3_tests}
-    ${CMAKE_SOURCE_DIR}/tests/unittest/functional_l3_tests.cpp
+    ${CMAKE_SOURCE_DIR}/tests/functionaltest/functional_l3_tests.cpp
+     ${CMAKE_SOURCE_DIR}/tests/functionaltest/Module.cpp
 )
 
 set_target_properties(${functional_l3_tests} PROPERTIES
@@ -36,9 +39,9 @@ target_include_directories(${functional_l3_tests} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-target_link_libraries(${functional_l3_tests}
-    ${NAMESPACE}Core::${NAMESPACE}Core
-    ${NAMESPACE}Plugins::${NAMESPACE}Plugins
+target_link_libraries(${functional_l3_tests} PRIVATE
+       ${NAMESPACE}Core::${NAMESPACE}Core
+       ${NAMESPACE}WebSocket::${NAMESPACE}WebSocket
 )
 
 install(TARGETS ${functional_l3_tests} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
