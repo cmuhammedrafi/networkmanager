@@ -22,13 +22,13 @@ set(functional_l3_tests "functional_l3_tests")
 
 find_package(${NAMESPACE}Core REQUIRED)
 
+add_executable(${functional_l3_tests}
+    ${CMAKE_SOURCE_DIR}/tests/unittest/functional_l3_tests.cpp
+)
+
 set_target_properties(${functional_l3_tests} PROPERTIES
     CXX_STANDARD 11
     CXX_STANDARD_REQUIRED YES
-)
-
-add_executable(${functional_l3_tests}
-    ${CMAKE_SOURCE_DIR}/tests/unittest/functional_l3_tests.cpp
 )
 
 target_include_directories(${functional_l3_tests} PRIVATE
