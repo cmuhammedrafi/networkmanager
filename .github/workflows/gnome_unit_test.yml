@@ -107,8 +107,10 @@ jobs:
           setsid WPEFramework -f -c ${PWD}/install/etc/WPEFramework/config.json &
           PID=$!
           echo "WPEFramework PID: $PID"
-
-          sleep 30
+          sleep 5 # Wait for WPEFramework to start
+          echo "Running unit tests..."
+          # Run the functional l3 tests
+          functional_l3_tests 
 
           # Kill the whole process group (includes child processes)
           kill -TERM -$(ps -o pgid= $PID | grep -o '[0-9]*') || true
