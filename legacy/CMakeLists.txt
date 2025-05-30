@@ -47,8 +47,7 @@ add_library(${PLUGIN_LEGACY_NETWORK} SHARED
 )
 
 if(CODE_COVERAGE)
-    target_compile_options(${PLUGIN_LEGACY_NETWORK} PRIVATE --coverage)
-    target_link_options(${PLUGIN_LEGACY_NETWORK} PRIVATE --coverage)
+    set_target_properties(${PLUGIN_LEGACY_NETWORK} PROPERTIES COMPILE_FLAGS "--coverage" LINK_FLAGS "--coverage")
 endif()
 
 target_link_libraries(${PLUGIN_LEGACY_NETWORK}  PRIVATE ${NAMESPACE}Core::${NAMESPACE}Core ${NAMESPACE}Plugins::${NAMESPACE}Plugins)
@@ -70,8 +69,7 @@ add_library(${PLUGIN_LEGACY_WIFI} SHARED
 )
 
 if(CODE_COVERAGE)
-    target_compile_options(${PLUGIN_LEGACY_WIFI} PRIVATE --coverage -O0 -g)
-    target_link_options(${PLUGIN_LEGACY_WIFI} PRIVATE --coverage)
+    set_target_properties(${PLUGIN_LEGACY_WIFI} PROPERTIES COMPILE_FLAGS "--coverage" LINK_FLAGS "--coverage")
 endif()
 
 target_link_libraries(${PLUGIN_LEGACY_WIFI}  PRIVATE ${NAMESPACE}Core::${NAMESPACE}Core ${NAMESPACE}Plugins::${NAMESPACE}Plugins)
