@@ -47,7 +47,7 @@ add_library(${PLUGIN_LEGACY_NETWORK} SHARED
 )
 
 if(CODE_COVERAGE)
-    target_compile_options(${PLUGIN_LEGACY_NETWORK} PRIVATE --coverage -O0 -g)
+    target_compile_options(${PLUGIN_LEGACY_NETWORK} PRIVATE --coverage)
     target_link_options(${PLUGIN_LEGACY_NETWORK} PRIVATE --coverage)
 endif()
 

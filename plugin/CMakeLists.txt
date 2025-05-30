@@ -82,7 +82,7 @@ add_library(${MODULE_IMPL_NAME} SHARED
                             ${PROXY_STUB_SOURCES})
 
 if(CODE_COVERAGE)
-    target_compile_options(${MODULE_NAME} PRIVATE --coverage -O0 -g)
+    target_compile_options(${MODULE_NAME} PRIVATE --coverage)
     target_link_options(${MODULE_NAME} PRIVATE --coverage)
 endif()
 
@@ -110,7 +110,7 @@ if(ENABLE_GNOME_NETWORKMANAGER)
         target_include_directories(${MODULE_IMPL_NAME} PRIVATE ${GLIB_INCLUDE_DIRS} ${LIBNM_INCLUDE_DIRS})
         target_link_libraries(${MODULE_IMPL_NAME} PRIVATE ${LIBNM_LIBRARIES})
         if(CODE_COVERAGE)
-            target_compile_options(${MODULE_IMPL_NAME} PRIVATE --coverage -O0 -g)
+            target_compile_options(${MODULE_IMPL_NAME} PRIVATE --coverage)
             target_link_options(${MODULE_IMPL_NAME} PRIVATE --coverage)
         endif()
     endif()

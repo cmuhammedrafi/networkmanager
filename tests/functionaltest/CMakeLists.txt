@@ -45,3 +45,4 @@ target_link_libraries(${functional_l3_tests} PRIVATE
 )
 
 install(TARGETS ${functional_l3_tests} DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+
