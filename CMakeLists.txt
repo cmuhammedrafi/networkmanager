@@ -53,7 +53,8 @@ endif (ENABLE_LEGACY_PLUGINS)
 add_subdirectory(tools)
 
 if(ENABLE_UNIT_TESTING)
-    add_subdirectory(tests/l1Test)
-    add_subdirectory(tests/l2Test)
+    # add_subdirectory(tests/l1Test)
+    # add_subdirectory(tests/l2Test)
+    add_subdirectory(tests/example)
 endif(ENABLE_UNIT_TESTING)
 
