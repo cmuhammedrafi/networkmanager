@@ -10,10 +10,11 @@ public:
 
     // NetworkManager library functions to mock
     virtual const char* nm_device_get_iface(NMDevice* device) = 0;
-    
-    // Add other NetworkManager functions as needed
-    // virtual NMClient* nm_client_new(GCancellable* cancellable, GError** error) = 0;
-    // virtual const GPtrArray* nm_client_get_devices(NMClient* client) = 0;
+    virtual const char* nm_device_get_hw_address(NMDevice* device) = 0;
+    virtual NMDeviceState nm_device_get_state(NMDevice* device) = 0;
+    virtual NMDeviceType nm_device_get_device_type(NMDevice* device) = 0;
+    virtual NMClient* nm_client_new(GCancellable* cancellable, GError** error) = 0;
+    virtual const GPtrArray* nm_client_get_devices(NMClient* client) = 0;
 };
 
 class LibnmWraps {
@@ -28,8 +29,9 @@ public:
 
     // NetworkManager library functions
     static const char* nm_device_get_iface(NMDevice* device);
-    
-    // Add other NetworkManager functions as needed
-    // static NMClient* nm_client_new(GCancellable* cancellable, GError** error);
-    // static const GPtrArray* nm_client_get_devices(NMClient* client);
+    static const char* nm_device_get_hw_address(NMDevice* device);
+    static NMDeviceState nm_device_get_state(NMDevice* device);
+    static NMDeviceType nm_device_get_device_type(NMDevice* device);
+    static NMClient* nm_client_new(GCancellable* cancellable, GError** error);
+    static const GPtrArray* nm_client_get_devices(NMClient* client);
 };
