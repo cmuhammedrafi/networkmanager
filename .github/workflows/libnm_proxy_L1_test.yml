@@ -130,10 +130,9 @@ jobs:
 
       - name: Generate coverage
         run: |
-            lcov -c -o coverage.info -d build/networkmanager_libnm
-            lcov -r coverage.info '/usr/include/*' '*/build/networkmanager_libnm/*' \
-                                  '*/install/usr/include/*' '*/tests/*' 'googlemock/*' 'googletest/*' \
-                                  -o filtered_coverage.info
+            lcov -c -o coverage.info -d build/networkmanager_libnm/
+            lcov -e coverage.info '*/networkmanager/plugin/gnome/*' -o filtered_coverage.info
+
       - name: Generate the html report
         run: |
             genhtml filtered_coverage.info --output-directory /tmp/coverage_report
