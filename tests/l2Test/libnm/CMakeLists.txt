@@ -48,6 +48,11 @@ set_target_properties(${NM_LIBNM_PROXY_L2_TEST} PROPERTIES
 
 target_compile_options(${NM_LIBNM_PROXY_L2_TEST} PRIVATE -Wall -include ${CMAKE_SOURCE_DIR}/interface/INetworkManager.h)
 
+# Add a definition to handle the NM_DEVICE macro in test
+target_compile_definitions(${NM_LIBNM_PROXY_L2_TEST} PRIVATE
+    NM_DEVICE_CAST_WORKAROUND=1
+)
+
 include_directories(${PROJECT_SOURCE_DIR}/interface)
 include_directories(${PROJECT_SOURCE_DIR}/plugin/rdk)
 include_directories(${PROJECT_SOURCE_DIR}/plugin)
@@ -80,8 +85,9 @@ target_link_options(${NM_LIBNM_PROXY_L2_TEST} PRIVATE
     -Wl,-wrap,nm_client_get_primary_connection
     -Wl,-wrap,nm_active_connection_get_connection
     -Wl,-wrap,nm_connection_get_interface_name
-    -Wl,-wrap,nm_device_get_iface
     -Wl,-wrap,nm_client_get_device_by_iface
+    -Wl,-wrap,nm_device_get_state
+    -Wl,-wrap,nm_client_get_devices
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")

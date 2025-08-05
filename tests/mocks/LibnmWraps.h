@@ -20,7 +20,7 @@ public:
     virtual const char* nm_connection_get_interface_name(NMRemoteConnection *connection) = 0; // Changed to NMRemoteConnection*
 
     // virtual NMClient* nm_client_new(GCancellable* cancellable, GError** error) = 0;
-    // virtual const GPtrArray* nm_client_get_devices(NMClient* client) = 0;
+    virtual const GPtrArray* nm_client_get_devices(NMClient* client) = 0;
 };
 
 class LibnmWraps {
@@ -45,5 +45,5 @@ public:
     
     // Add other NetworkManager functions as needed
     // static NMClient* nm_client_new(GCancellable* cancellable, GError** error);
-    // static const GPtrArray* nm_client_get_devices(NMClient* client);
+    static const GPtrArray* nm_client_get_devices(NMClient* client);
 };

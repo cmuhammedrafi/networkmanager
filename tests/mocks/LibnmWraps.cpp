@@ -26,14 +26,10 @@ extern "C" NMDeviceState __wrap_nm_device_get_state(NMDevice *device) {
     return LibnmWraps::getInstance().nm_device_get_state(device);
 }
 
-// Add other wrappers as needed
-// extern "C" NMClient* __wrap_nm_client_new(GCancellable* cancellable, GError** error) {
-//     return LibnmWraps::getInstance().nm_client_new(cancellable, error);
-// }
-
-// extern "C" const GPtrArray* __wrap_nm_client_get_devices(NMClient* client) {
-//     return LibnmWraps::getInstance().nm_client_get_devices(client);
-// }
+// Add wrapper function
+extern "C" const GPtrArray* __wrap_nm_client_get_devices(NMClient* client) {
+    return LibnmWraps::getInstance().nm_client_get_devices(client);
+}
 
 // Initialize static member
 LibnmWrapsImpl* LibnmWraps::impl = nullptr;
@@ -81,13 +77,8 @@ NMDeviceState LibnmWraps::nm_device_get_state(NMDevice *device) {
     return impl->nm_device_get_state(device);
 }
 
-// Add implementations for other functions as needed
-// NMClient* LibnmWraps::nm_client_new(GCancellable* cancellable, GError** error) {
-//     EXPECT_NE(impl, nullptr);
-//     return impl->nm_client_new(cancellable, error);
-// }
-
-// const GPtrArray* LibnmWraps::nm_client_get_devices(NMClient* client) {
-//     EXPECT_NE(impl, nullptr);
-//     return impl->nm_client_get_devices(client);
-// }
+// Add implementation
+const GPtrArray* LibnmWraps::nm_client_get_devices(NMClient* client) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_client_get_devices(client);
+}

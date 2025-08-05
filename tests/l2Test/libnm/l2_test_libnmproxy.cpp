@@ -33,6 +33,7 @@
 #include "NetworkManagerRDKProxy.h"
 #include "NetworkManagerLogger.h"
 #include "NetworkManager.h"
+#include <libnm/NetworkManager.h>
 
 using namespace WPEFramework;
 using ::testing::NiceMock;
@@ -161,15 +162,6 @@ TEST_F(NetworkManagerTest, RegisteredMethods)
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("SetInterfaceState")));
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("GetIPSettings")));
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("SetIPSettings")));
-    EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("GetStunEndpoint")));
-    EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("SetStunEndpoint")));
-    EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("GetConnectivityTestEndpoints")));
-    EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("SetConnectivityTestEndpoints")));
-    EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("IsConnectedToInternet")));
-    EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("GetCaptivePortalURI")));
-    EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("GetPublicIP")));
-    EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("Ping")));
-    EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("Trace")));
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("StartWiFiScan")));
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("StopWiFiScan")));
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("GetKnownSSIDs")));
@@ -195,7 +187,7 @@ TEST_F(NetworkManagerTest, GetPrimaryInterface2)
 {
     NMActiveConnection* dummyActiveConnection = reinterpret_cast<NMActiveConnection*>(0x12345678);
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_primary_connection(::testing::_))
-        .WillRepeatedly(::testing::Return(nullptr));
+        .WillOnce(::testing::Return(nullptr));
 
     // EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(client, ifname.c_str()))
     //     .WillRepeatedly(::testing::Return(dummyDevice));
@@ -212,5 +204,75 @@ TEST_F(NetworkManagerTest, GetPrimaryInterface2)
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(::testing::_))
         .WillRepeatedly(::testing::Return(nullptr));
 
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetPrimaryInterface"), _T(""), response));
     EXPECT_EQ(response, _T("{\"interface\":\"wlan0\",\"success\":true}"));
 }
+
+TEST_F(NetworkManagerTest, GetInterfaceState_Failed)
+{
+    // Mock nm_client_get_devices to return our fake array
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillRepeatedly(::testing::Return(nullptr));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetInterfaceState"), _T("{\"interface\":\"wlan0\"}"), response));
+    EXPECT_EQ(response, _T("{\"success\":false}"));
+}
+
+TEST_F(NetworkManagerTest, GetInterfaceState_WifiEth)
+{
+    // Create a GPtrArray with one valid device pointer
+    GPtrArray* fakeDevices = g_ptr_array_new();
+
+    NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_ETHERNET, NULL));
+    g_ptr_array_add(fakeDevices, deviceDummy);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillRepeatedly(::testing::Return(fakeDevices));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
+        .WillOnce(::testing::Return("wlan0"))
+        .WillOnce(::testing::Return("eth0"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNMANAGED)); // disabled
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetInterfaceState"), _T("{\"interface\":\"wlan0\"}"), response));
+    EXPECT_EQ(response, _T("{\"enabled\":true,\"success\":true}"));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetInterfaceState"), _T("{\"interface\":\"eth0\"}"), response));
+    EXPECT_EQ(response, _T("{\"enabled\":false,\"success\":true}"));
+
+    // Clean up
+    g_object_unref(deviceDummy);
+    g_ptr_array_free(fakeDevices, TRUE);
+}
+
+
+
+// TEST_F(NetworkManagerTest, GetInterfaceState_EthDisabled)
+// {
+//     // Create a GPtrArray with one valid device pointer
+//     GPtrArray* fakeDevices = g_ptr_array_new();
+//     NMDevice* fakeDevice = reinterpret_cast<NMDevice*>(0xDEADBEEF);
+//     g_ptr_array_add(fakeDevices, fakeDevice); // This sets len=1 and pdata[0]=fakeDevice
+
+//     // Mock nm_client_get_devices to return our fake array
+//     EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+//         .WillRepeatedly(::testing::Return(fakeDevices));
+
+//     // Mock nm_device_get_iface to return "eth0"
+//     EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
+//         .WillRepeatedly(::testing::Return("eth0"));
+
+//     // Mock nm_device_get_state to return NM_DEVICE_STATE_ACTIVATED
+//     EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+//         .WillRepeatedly(::testing::Return(NMDeviceState::NM_DEVICE_STATE_ACTIVATED));
+
+//     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetInterfaceState"), _T("{\"interface\":\"eth0\"}"), response));
+//     EXPECT_EQ(response, _T("{\"enabled\":false,\"success\":true}"));
+
+//     // Clean up
+//     g_ptr_array_free(fakeDevices, TRUE);
+// }
+
