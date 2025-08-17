@@ -57,9 +57,7 @@ public:
         ON_CALL(*this, nm_client_new(::testing::_, ::testing::_))
             .WillByDefault(::testing::Invoke(
             [&](GCancellable* cancellable, GError** error) -> NMClient* {
-                NMClient* client = __real_nm_client_new(cancellable, error);
-                s_realClient = client;
-                return client;
+                return __real_nm_client_new(cancellable, error);
             }));
         ON_CALL(*this, nm_device_get_hw_address(::testing::_))
             .WillByDefault(::testing::Invoke(
@@ -95,8 +93,5 @@ public:
     MOCK_METHOD(void*, nm_connection_get_setting_ip4_config, (void* connection), ());
     MOCK_METHOD(const char*, nm_setting_ip_config_get_method, (void* ip_config), ());
 
-    static NMClient* s_realClient;
-    static NMClient* getSavedRealNMClient() { return s_realClient; }
 };
 
-NMClient* LibnmWrapsImplMock::s_realClient = nullptr;

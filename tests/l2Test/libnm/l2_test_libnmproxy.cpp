@@ -32,7 +32,6 @@
 #include "COMLinkMock.h"
 #include "WorkerPoolImplementation.h"
 #include "NetworkManagerImplementation.h"
-#include "NetworkManagerRDKProxy.h"
 #include "NetworkManagerLogger.h"
 #include "NetworkManager.h"
 #include <libnm/NetworkManager.h>
@@ -315,6 +314,25 @@ TEST_F(NetworkManagerTest, GetPrimaryInterface_ActiveConnection_unknown)
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetPrimaryInterface"), _T(""), response));
     EXPECT_EQ(response, _T("{\"success\":false}"));
+    g_object_unref(dummyActiveConn);
+    g_object_unref(dummyRemoteConn);
+}
+
+TEST_F(NetworkManagerTest, GetPrimaryInterface_ActiveConnection_iface_null)
+{
+    NMActiveConnection *dummyActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    NMRemoteConnection *dummyRemoteConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_primary_connection(::testing::_))
+        .WillOnce(::testing::Return(dummyActiveConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(dummyActiveConn))
+            .WillOnce(::testing::Return(dummyRemoteConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_interface_name(dummyRemoteConn))
+        .WillOnce(::testing::Return(nullptr));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetPrimaryInterface"), _T(""), response));
+    EXPECT_EQ(response, _T("{\"interface\":\"wlan0\",\"success\":true}"));
     g_object_unref(dummyActiveConn);
     g_object_unref(dummyRemoteConn);
 }

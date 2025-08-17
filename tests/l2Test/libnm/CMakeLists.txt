@@ -24,6 +24,7 @@ FetchContent_MakeAvailable(googletest)
 message("networkmanager building with libnm")
 add_executable(${NM_LIBNM_PROXY_L2_TEST}
     ${CMAKE_SOURCE_DIR}/tests/l2Test/libnm/l2_test_libnmproxy.cpp
+    ${CMAKE_SOURCE_DIR}/tests/l2Test/libnm/l2_test_libnmproxyInit.cpp
     ${CMAKE_SOURCE_DIR}/tests/mocks/thunder/Module.cpp
     ${CMAKE_SOURCE_DIR}/tests/mocks/Wraps.cpp
     ${CMAKE_SOURCE_DIR}/tests/mocks/LibnmWraps.cpp
