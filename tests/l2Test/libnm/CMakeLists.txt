@@ -88,6 +88,8 @@ target_link_options(${NM_LIBNM_PROXY_L2_TEST} PRIVATE
     -Wl,-wrap,nm_client_get_device_by_iface
     -Wl,-wrap,nm_device_get_state
     -Wl,-wrap,nm_client_get_devices
+    -Wl,-wrap,nm_client_new
+    -Wl,-wrap,nm_device_get_hw_address
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")

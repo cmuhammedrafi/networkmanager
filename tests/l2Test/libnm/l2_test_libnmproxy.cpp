@@ -21,6 +21,8 @@
 #include <string>
 #include <vector>
 #include <cstdio>
+#include <sys/stat.h>
+#include <fstream>
 
 #include "FactoriesImplementation.h"
 #include "WrapsMock.h"
@@ -45,6 +47,7 @@ protected:
     DECL_CORE_JSONRPC_CONX connection;
     Core::JSONRPC::Message message;
     string response;
+    NMClient* gNmClient = NULL;
 
     WrapsImplMock *p_wrapsImplMock = nullptr;
     LibnmWrapsImplMock *p_libnmWrapsImplMock = nullptr;
@@ -62,10 +65,10 @@ protected:
         , INIT_CONX(1, 0)
         , workerPool(Core::ProxyType<WorkerPoolImplementation>::Create(2, Core::Thread::DefaultStackSize(), 16))
     {
-        // Initialize libnmWrapsImplMock
+
         p_libnmWrapsImplMock = new NiceMock <LibnmWrapsImplMock>;
         LibnmWraps::setImpl(p_libnmWrapsImplMock);
-        // Initialize WrapsImplMock
+
         p_wrapsImplMock = new NiceMock <WrapsImplMock>;
         Wraps::setImpl(p_wrapsImplMock);
         ON_CALL(service, COMLink())
@@ -101,6 +104,12 @@ protected:
                 "}"
             ));
 
+        EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+            .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+        EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+            .WillRepeatedly(::testing::Return(NM_DEVICE_STATE_UNMANAGED));
+
         ON_CALL(comLinkMock, Instantiate(::testing::_, ::testing::_, ::testing::_))
             .WillByDefault(::testing::Invoke(
                     [&](const RPC::Object& object, const uint32_t waitTime, uint32_t& connectionId) {
@@ -123,7 +132,17 @@ protected:
 
     virtual void SetUp() override
     {
-        // remove any previous connectivity endpoints file
+        struct stat buffer;
+        if (stat("/etc/device.properties", &buffer) != 0) {
+            std::ofstream file("/etc/device.properties");
+            if (file.is_open()) {
+                file << "ETHERNET_INTERFACE=eth0\nWIFI_INTERFACE=wlan0\n";
+                file.close();
+            }
+            else {
+                std::cerr << "Failed to create /etc/device.properties file." << std::endl;
+            }
+        }
     }
 
     virtual ~NetworkManagerTest() override
@@ -177,41 +196,131 @@ TEST_F(NetworkManagerTest, RegisteredMethods)
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("GetSupportedSecurityModes")));
 }
 
-TEST_F(NetworkManagerTest, GetPrimaryInterface)
+TEST_F(NetworkManagerTest, GetPrimaryInterface_eth0)
 {
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(reinterpret_cast<NMDevice*>(0x100178)))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetPrimaryInterface"), _T(""), response));
-    EXPECT_EQ(response, _T("{\"interface\":\"wlan0\",\"success\":true}"));
+    EXPECT_EQ(response, _T("{\"interface\":\"eth0\",\"success\":true}"));
 }
 
-TEST_F(NetworkManagerTest, GetPrimaryInterface2)
+TEST_F(NetworkManagerTest, GetPrimaryInterface_wlan0)
 {
-    NMActiveConnection* dummyActiveConnection = reinterpret_cast<NMActiveConnection*>(0x12345678);
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_primary_connection(::testing::_))
-        .WillOnce(::testing::Return(nullptr));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
 
-    // EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(client, ifname.c_str()))
-    //     .WillRepeatedly(::testing::Return(dummyDevice));
-
-    // EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(dummyDevice))
-    //     .WillRepeatedly(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
-
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetPrimaryInterface"), _T(""), response));
-    EXPECT_EQ(response, _T("{\"interface\":\"wlan0\",\"success\":true}"));
-
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_primary_connection(::testing::_))
-        .WillRepeatedly(::testing::Return(dummyActiveConnection));
-
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(::testing::_))
-        .WillRepeatedly(::testing::Return(nullptr));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(reinterpret_cast<NMDevice*>(0x100178)))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNAVAILABLE));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetPrimaryInterface"), _T(""), response));
     EXPECT_EQ(response, _T("{\"interface\":\"wlan0\",\"success\":true}"));
 }
 
-/*
+TEST_F(NetworkManagerTest, GetPrimaryInterface_ActiveConnection_null_eth0)
+{
+    NMActiveConnection *dummyActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(reinterpret_cast<NMDevice*>(0x100178)))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_primary_connection(::testing::_))
+        .WillOnce(::testing::Return(dummyActiveConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(dummyActiveConn))
+        .WillOnce(::testing::Return(reinterpret_cast<NMRemoteConnection*>(NULL)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetPrimaryInterface"), _T(""), response));
+    EXPECT_EQ(response, _T("{\"interface\":\"eth0\",\"success\":true}"));
+    g_object_unref(dummyActiveConn);
+}
+
+TEST_F(NetworkManagerTest, GetPrimaryInterface_ActiveConnection_null_wlan0)
+{
+    NMActiveConnection *dummyActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(reinterpret_cast<NMDevice*>(0x100178)))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNAVAILABLE));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_primary_connection(::testing::_))
+        .WillOnce(::testing::Return(dummyActiveConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(dummyActiveConn))
+        .WillOnce(::testing::Return(reinterpret_cast<NMRemoteConnection*>(NULL)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetPrimaryInterface"), _T(""), response));
+    EXPECT_EQ(response, _T("{\"interface\":\"wlan0\",\"success\":true}"));
+    g_object_unref(dummyActiveConn);
+}
+
+TEST_F(NetworkManagerTest, GetPrimaryInterface_ActiveConnection_wlan0)
+{
+    NMActiveConnection *dummyActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    NMRemoteConnection *dummyRemoteConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_primary_connection(::testing::_))
+        .WillOnce(::testing::Return(dummyActiveConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(dummyActiveConn))
+            .WillOnce(::testing::Return(dummyRemoteConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_interface_name(dummyRemoteConn))
+        .WillOnce(::testing::Return("wlan0"));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetPrimaryInterface"), _T(""), response));
+    EXPECT_EQ(response, _T("{\"interface\":\"wlan0\",\"success\":true}"));
+    g_object_unref(dummyActiveConn);
+    g_object_unref(dummyRemoteConn);
+}
+
+TEST_F(NetworkManagerTest, GetPrimaryInterface_ActiveConnection_eth0)
+{
+    NMActiveConnection *dummyActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    NMRemoteConnection *dummyRemoteConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_primary_connection(::testing::_))
+        .WillOnce(::testing::Return(dummyActiveConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(dummyActiveConn))
+            .WillOnce(::testing::Return(dummyRemoteConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_interface_name(dummyRemoteConn))
+        .WillOnce(::testing::Return("eth0"));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetPrimaryInterface"), _T(""), response));
+    EXPECT_EQ(response, _T("{\"interface\":\"eth0\",\"success\":true}"));
+    g_object_unref(dummyActiveConn);
+    g_object_unref(dummyRemoteConn);
+}
+
+TEST_F(NetworkManagerTest, GetPrimaryInterface_ActiveConnection_unknown)
+{
+    NMActiveConnection *dummyActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    NMRemoteConnection *dummyRemoteConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_primary_connection(::testing::_))
+        .WillOnce(::testing::Return(dummyActiveConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(dummyActiveConn))
+            .WillOnce(::testing::Return(dummyRemoteConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_interface_name(dummyRemoteConn))
+        .WillOnce(::testing::Return("unknown"));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetPrimaryInterface"), _T(""), response));
+    EXPECT_EQ(response, _T("{\"success\":false}"));
+    g_object_unref(dummyActiveConn);
+    g_object_unref(dummyRemoteConn);
+}
+
 TEST_F(NetworkManagerTest, GetInterfaceState_Failed)
 {
-    // Mock nm_client_get_devices to return our fake array
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
         .WillRepeatedly(::testing::Return(nullptr));
 
@@ -221,7 +330,6 @@ TEST_F(NetworkManagerTest, GetInterfaceState_Failed)
 
 TEST_F(NetworkManagerTest, GetInterfaceState_WifiEth)
 {
-    // Create a GPtrArray with one valid device pointer
     GPtrArray* fakeDevices = g_ptr_array_new();
 
     NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_ETHERNET, NULL));
@@ -244,45 +352,7 @@ TEST_F(NetworkManagerTest, GetInterfaceState_WifiEth)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetInterfaceState"), _T("{\"interface\":\"eth0\"}"), response));
     EXPECT_EQ(response, _T("{\"enabled\":false,\"success\":true}"));
 
-    // Clean up
     g_object_unref(deviceDummy);
-    g_ptr_array_free(fakeDevices, TRUE);
-}
-
-TEST_F(NetworkManagerTest, GetAvailableInterfaces_WifiAndEth)
-{
-    // Setup fake devices array with wifi and ethernet
-    GPtrArray* fakeDevices = g_ptr_array_new();
-    NMDevice* wifiDevice = reinterpret_cast<NMDevice*>(0x1001);
-    NMDevice* ethDevice = reinterpret_cast<NMDevice*>(0x1002);
-    g_ptr_array_add(fakeDevices, wifiDevice);
-    g_ptr_array_add(fakeDevices, ethDevice);
-
-    // Mock device iface names
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
-        .WillOnce(::testing::Return(fakeDevices));
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(wifiDevice))
-        .WillOnce(::testing::Return("wlan0"));
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(ethDevice))
-        .WillOnce(::testing::Return("eth0"));
-    // Mock device hw address
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_hw_address(wifiDevice))
-        .WillOnce(::testing::Return("00:11:22:33:44:55"));
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_hw_address(ethDevice))
-        .WillOnce(::testing::Return("66:77:88:99:AA:BB"));
-    // Mock device state
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(wifiDevice))
-        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(ethDevice))
-        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNAVAILABLE));
-
-    // Call the API via JSONRPC handler
-    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetAvailableInterfaces"), _T(""), response));
-    // Response should contain both interfaces and success true
-    EXPECT_TRUE(response.find("wlan0") != std::string::npos);
-    EXPECT_TRUE(response.find("eth0") != std::string::npos);
-    EXPECT_TRUE(response.find("\"success\":true") != std::string::npos);
-
     g_ptr_array_free(fakeDevices, TRUE);
 }
 
@@ -291,21 +361,87 @@ TEST_F(NetworkManagerTest, GetAvailableInterfaces_DevicesNull)
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
         .WillOnce(::testing::Return(nullptr));
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetAvailableInterfaces"), _T(""), response));
-    EXPECT_TRUE(response.find("\"success\":true") != std::string::npos);
+    EXPECT_TRUE(response.find("\"success\":false") != std::string::npos);
 }
 
-TEST_F(NetworkManagerTest, GetAvailableInterfaces_DeviceIfaceNull)
+TEST_F(NetworkManagerTest, GetAvailableInterfaces_Enabled)
 {
     GPtrArray* fakeDevices = g_ptr_array_new();
-    NMDevice* nullIfaceDevice = reinterpret_cast<NMDevice*>(0x2001);
-    g_ptr_array_add(fakeDevices, nullIfaceDevice);
+    NMDevice *ethDevice = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_ETHERNET, NULL));
+    NMDevice* wifiDevice = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
+    g_ptr_array_add(fakeDevices, wifiDevice);
+    g_ptr_array_add(fakeDevices, ethDevice);
+
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
         .WillOnce(::testing::Return(fakeDevices));
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(nullIfaceDevice))
-        .WillOnce(::testing::Return(nullptr));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(ethDevice))
+        .WillOnce(::testing::Return("eth0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(wifiDevice))
+        .WillOnce(::testing::Return("wlan0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_hw_address(ethDevice))
+        .WillOnce(::testing::Return("00:11:22:33:44:55"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_hw_address(wifiDevice))
+        .WillOnce(::testing::Return("66:77:88:99:AA:BB"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(ethDevice))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(wifiDevice))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNAVAILABLE));
+
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetAvailableInterfaces"), _T(""), response));
-    EXPECT_TRUE(response.find("\"success\":true") != std::string::npos);
+    EXPECT_TRUE(response.find("wlan0") != std::string::npos);
+    EXPECT_TRUE(response.find("eth0") != std::string::npos);
+
+    std::string expectedResponse =
+        _T("{\"interfaces\":[")
+        _T("{\"type\":\"WIFI\",\"name\":\"wlan0\",\"mac\":\"66:77:88:99:AA:BB\",\"enabled\":true,\"connected\":false},")
+        _T("{\"type\":\"ETHERNET\",\"name\":\"eth0\",\"mac\":\"00:11:22:33:44:55\",\"enabled\":true,\"connected\":true}")
+        _T("],\"success\":true}");
+    EXPECT_EQ(response, expectedResponse);
+
+    g_object_unref(ethDevice);
+    g_object_unref(wifiDevice);
     g_ptr_array_free(fakeDevices, TRUE);
 }
 
-*/
+TEST_F(NetworkManagerTest, GetAvailableInterfaces_disabled)
+{
+    GPtrArray* fakeDevices = g_ptr_array_new();
+    NMDevice *ethDevice = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_ETHERNET, NULL));
+    NMDevice* wifiDevice = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
+    g_ptr_array_add(fakeDevices, wifiDevice);
+    g_ptr_array_add(fakeDevices, ethDevice);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillOnce(::testing::Return(fakeDevices));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(ethDevice))
+        .WillOnce(::testing::Return("eth0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(wifiDevice))
+        .WillOnce(::testing::Return("wlan0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_hw_address(ethDevice))
+        .WillOnce(::testing::Return("00:11:22:33:44:55"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_hw_address(wifiDevice))
+        .WillOnce(::testing::Return("66:77:88:99:AA:BB"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(ethDevice))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNMANAGED));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(wifiDevice))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNMANAGED));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetAvailableInterfaces"), _T(""), response));
+    EXPECT_TRUE(response.find("wlan0") != std::string::npos);
+    EXPECT_TRUE(response.find("eth0") != std::string::npos);
+
+    std::string expectedResponse =
+        _T("{\"interfaces\":[")
+        _T("{\"type\":\"WIFI\",\"name\":\"wlan0\",\"mac\":\"66:77:88:99:AA:BB\",\"enabled\":false,\"connected\":false},")
+        _T("{\"type\":\"ETHERNET\",\"name\":\"eth0\",\"mac\":\"00:11:22:33:44:55\",\"enabled\":false,\"connected\":false}")
+        _T("],\"success\":true}");
+    EXPECT_EQ(response, expectedResponse);
+
+    g_object_unref(ethDevice);
+    g_object_unref(wifiDevice);
+    g_ptr_array_free(fakeDevices, TRUE);
+}
