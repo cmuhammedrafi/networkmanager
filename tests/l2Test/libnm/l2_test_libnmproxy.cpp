@@ -121,12 +121,13 @@ protected:
         Core::IWorkerPool::Assign(&(*workerPool));
         workerPool->Run();
 
+
         dispatcher = static_cast<PLUGINHOST_DISPATCHER*>(
         plugin->QueryInterface(PLUGINHOST_DISPATCHER_ID));
         dispatcher->Activate(&service);
         response = plugin->Initialize(&service);
         EXPECT_EQ(string(""), response);
-        NetworkManagerLogger::SetLevel(static_cast<NetworkManagerLogger::LogLevel>(NetworkManagerLogger::DEBUG_LEVEL)); // Set log level to DEBUG_LEVEL
+        NetworkManagerLogger::SetLevel(static_cast<NetworkManagerLogger::LogLevel>(NetworkManagerLogger::DEBUG_LEVEL));
     }
 
     virtual void SetUp() override
@@ -147,7 +148,6 @@ protected:
     virtual ~NetworkManagerTest() override
     {
         plugin->Deinitialize(&service);
-
         dispatcher->Deactivate();
         dispatcher->Release();
 
@@ -372,6 +372,39 @@ TEST_F(NetworkManagerTest, GetInterfaceState_WifiEth)
 
     g_object_unref(deviceDummy);
     g_ptr_array_free(fakeDevices, TRUE);
+}
+
+TEST_F(NetworkManagerTest, GetInterfaceState_WifiEthNotFound)
+{
+    GPtrArray* fakeDevices = g_ptr_array_new();
+
+    NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_ETHERNET, NULL));
+    g_ptr_array_add(fakeDevices, deviceDummy);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillRepeatedly(::testing::Return(fakeDevices));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
+        .WillOnce(::testing::Return("wlan1"));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetInterfaceState"), _T("{\"interface\":\"wlan0\"}"), response));
+    EXPECT_EQ(response, _T("{\"success\":false}"));
+
+    g_object_unref(deviceDummy);
+    g_ptr_array_free(fakeDevices, TRUE);
+}
+
+TEST_F(NetworkManagerTest, GetInterfaceState_unknown)
+{
+    Core::ProxyType<Plugin::NetworkManagerImplementation> NetworkManagerImpl2 = Core::ProxyType<Plugin::NetworkManagerImplementation>::Create();
+    Exchange::INetworkManager* interface = static_cast<Exchange::INetworkManager*>(NetworkManagerImpl2->QueryInterface(Exchange::INetworkManager::ID));
+    ASSERT_TRUE(interface != nullptr);
+
+    bool isEnabled;
+    std::string ifaceName = "wlan1";
+    uint32_t result = interface->GetInterfaceState(ifaceName, isEnabled);
+    EXPECT_EQ(result, Core::ERROR_GENERAL);
+    EXPECT_EQ(isEnabled, false);
 }
 
 TEST_F(NetworkManagerTest, GetAvailableInterfaces_DevicesNull)
