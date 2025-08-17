@@ -52,6 +52,7 @@ public:
             [&](NMClient* client) -> const GPtrArray* {
                 return __real_nm_client_get_devices(client);
             }));
+    // Add default behaviors for new mocks if needed
     }
     
     virtual ~LibnmWrapsImplMock() = default;
@@ -69,4 +70,21 @@ public:
     // Add other mock methods as needed
     // MOCK_METHOD(NMClient*, nm_client_new, (GCancellable* cancellable, GError** error), (override));
     MOCK_METHOD(const GPtrArray*, nm_client_get_devices, (NMClient* client), (override));
+
+    // Additional libnm mocks for full coverage
+    MOCK_METHOD(const GPtrArray*, nm_client_get_active_connections, (NMClient* client), ());
+    MOCK_METHOD(const char*, nm_device_get_hw_address, (NMDevice* device), ());
+    MOCK_METHOD(int, nm_device_get_type, (NMDevice* device), ());
+    MOCK_METHOD(const GPtrArray*, nm_ip_config_get_addresses, (void* ip_config), ());
+    MOCK_METHOD(const char*, nm_ip_config_get_gateway, (void* ip_config), ());
+    MOCK_METHOD(char**, nm_ip_config_get_nameservers, (void* ip_config), ());
+    MOCK_METHOD(void*, nm_active_connection_get_ip4_config, (NMActiveConnection* conn), ());
+    MOCK_METHOD(void*, nm_active_connection_get_ip6_config, (NMActiveConnection* conn), ());
+    MOCK_METHOD(void*, nm_active_connection_get_dhcp4_config, (NMActiveConnection* conn), ());
+    MOCK_METHOD(void*, nm_active_connection_get_dhcp6_config, (NMActiveConnection* conn), ());
+    MOCK_METHOD(const char*, nm_dhcp_config_get_one_option, (void* dhcp_config, const char* opt), ());
+    MOCK_METHOD(void*, nm_connection_get_setting_connection, (void* connection), ());
+    MOCK_METHOD(const char*, nm_setting_connection_get_interface_name, (void* settings), ());
+    MOCK_METHOD(void*, nm_connection_get_setting_ip4_config, (void* connection), ());
+    MOCK_METHOD(const char*, nm_setting_ip_config_get_method, (void* ip_config), ());
 };

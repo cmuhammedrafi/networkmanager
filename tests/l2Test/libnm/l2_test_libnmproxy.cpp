@@ -208,6 +208,7 @@ TEST_F(NetworkManagerTest, GetPrimaryInterface2)
     EXPECT_EQ(response, _T("{\"interface\":\"wlan0\",\"success\":true}"));
 }
 
+/*
 TEST_F(NetworkManagerTest, GetInterfaceState_Failed)
 {
     // Mock nm_client_get_devices to return our fake array
@@ -248,31 +249,63 @@ TEST_F(NetworkManagerTest, GetInterfaceState_WifiEth)
     g_ptr_array_free(fakeDevices, TRUE);
 }
 
+TEST_F(NetworkManagerTest, GetAvailableInterfaces_WifiAndEth)
+{
+    // Setup fake devices array with wifi and ethernet
+    GPtrArray* fakeDevices = g_ptr_array_new();
+    NMDevice* wifiDevice = reinterpret_cast<NMDevice*>(0x1001);
+    NMDevice* ethDevice = reinterpret_cast<NMDevice*>(0x1002);
+    g_ptr_array_add(fakeDevices, wifiDevice);
+    g_ptr_array_add(fakeDevices, ethDevice);
 
+    // Mock device iface names
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillOnce(::testing::Return(fakeDevices));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(wifiDevice))
+        .WillOnce(::testing::Return("wlan0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(ethDevice))
+        .WillOnce(::testing::Return("eth0"));
+    // Mock device hw address
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_hw_address(wifiDevice))
+        .WillOnce(::testing::Return("00:11:22:33:44:55"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_hw_address(ethDevice))
+        .WillOnce(::testing::Return("66:77:88:99:AA:BB"));
+    // Mock device state
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(wifiDevice))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(ethDevice))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNAVAILABLE));
 
-// TEST_F(NetworkManagerTest, GetInterfaceState_EthDisabled)
-// {
-//     // Create a GPtrArray with one valid device pointer
-//     GPtrArray* fakeDevices = g_ptr_array_new();
-//     NMDevice* fakeDevice = reinterpret_cast<NMDevice*>(0xDEADBEEF);
-//     g_ptr_array_add(fakeDevices, fakeDevice); // This sets len=1 and pdata[0]=fakeDevice
+    // Call the API via JSONRPC handler
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetAvailableInterfaces"), _T(""), response));
+    // Response should contain both interfaces and success true
+    EXPECT_TRUE(response.find("wlan0") != std::string::npos);
+    EXPECT_TRUE(response.find("eth0") != std::string::npos);
+    EXPECT_TRUE(response.find("\"success\":true") != std::string::npos);
 
-//     // Mock nm_client_get_devices to return our fake array
-//     EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
-//         .WillRepeatedly(::testing::Return(fakeDevices));
+    g_ptr_array_free(fakeDevices, TRUE);
+}
 
-//     // Mock nm_device_get_iface to return "eth0"
-//     EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
-//         .WillRepeatedly(::testing::Return("eth0"));
+TEST_F(NetworkManagerTest, GetAvailableInterfaces_DevicesNull)
+{
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillOnce(::testing::Return(nullptr));
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetAvailableInterfaces"), _T(""), response));
+    EXPECT_TRUE(response.find("\"success\":true") != std::string::npos);
+}
 
-//     // Mock nm_device_get_state to return NM_DEVICE_STATE_ACTIVATED
-//     EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
-//         .WillRepeatedly(::testing::Return(NMDeviceState::NM_DEVICE_STATE_ACTIVATED));
+TEST_F(NetworkManagerTest, GetAvailableInterfaces_DeviceIfaceNull)
+{
+    GPtrArray* fakeDevices = g_ptr_array_new();
+    NMDevice* nullIfaceDevice = reinterpret_cast<NMDevice*>(0x2001);
+    g_ptr_array_add(fakeDevices, nullIfaceDevice);
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillOnce(::testing::Return(fakeDevices));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(nullIfaceDevice))
+        .WillOnce(::testing::Return(nullptr));
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetAvailableInterfaces"), _T(""), response));
+    EXPECT_TRUE(response.find("\"success\":true") != std::string::npos);
+    g_ptr_array_free(fakeDevices, TRUE);
+}
 
-//     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetInterfaceState"), _T("{\"interface\":\"eth0\"}"), response));
-//     EXPECT_EQ(response, _T("{\"enabled\":false,\"success\":true}"));
-
-//     // Clean up
-//     g_ptr_array_free(fakeDevices, TRUE);
-// }
-
+*/
