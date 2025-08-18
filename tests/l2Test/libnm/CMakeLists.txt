@@ -90,7 +90,23 @@ target_link_options(${NM_LIBNM_PROXY_L2_TEST} PRIVATE
     -Wl,-wrap,nm_device_get_state
     -Wl,-wrap,nm_client_get_devices
     -Wl,-wrap,nm_client_new
-    -Wl,-wrap,nm_device_get_hw_address
+     -Wl,-wrap,nm_device_get_hw_address
+    -Wl,-wrap,nm_client_get_active_connections
+    -Wl,-wrap,nm_connection_get_setting_connection
+    -Wl,-wrap,nm_setting_connection_get_interface_name
+    -Wl,-wrap,nm_active_connection_get_ip4_config
+    -Wl,-wrap,nm_active_connection_get_ip6_config
+    -Wl,-wrap,nm_active_connection_get_dhcp4_config
+    -Wl,-wrap,nm_active_connection_get_dhcp6_config
+    -Wl,-wrap,nm_connection_get_setting_ip4_config
+    -Wl,-wrap,nm_connection_get_setting_ip6_config
+    -Wl,-wrap,nm_setting_ip_config_get_method
+    -Wl,-wrap,nm_ip_config_get_addresses
+    -Wl,-wrap,nm_ip_address_get_address
+    -Wl,-wrap,nm_ip_address_get_prefix
+    -Wl,-wrap,nm_ip_config_get_gateway
+    -Wl,-wrap,nm_ip_config_get_nameservers
+    -Wl,-wrap,nm_dhcp_config_get_one_option
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")

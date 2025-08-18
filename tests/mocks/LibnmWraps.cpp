@@ -37,6 +37,70 @@ extern "C" const GPtrArray* __wrap_nm_client_get_devices(NMClient* client) {
     return LibnmWraps::getInstance().nm_client_get_devices(client);
 }
 
+extern "C" const GPtrArray* __wrap_nm_client_get_active_connections(NMClient* client) {
+    return LibnmWraps::getInstance().nm_client_get_active_connections(client);
+}
+
+extern "C" NMSettingIPConfig* __wrap_nm_connection_get_setting_ip4_config(NMConnection* connection) {
+    return LibnmWraps::getInstance().nm_connection_get_setting_ip4_config(connection);
+}
+
+extern "C" NMSettingIPConfig* __wrap_nm_connection_get_setting_ip6_config(NMConnection* connection) {
+    return LibnmWraps::getInstance().nm_connection_get_setting_ip6_config(connection);
+}
+
+extern "C" const char* __wrap_nm_setting_ip_config_get_method(NMSettingIPConfig* setting) {
+    return LibnmWraps::getInstance().nm_setting_ip_config_get_method(setting);
+}
+
+extern "C" NMSettingConnection* __wrap_nm_connection_get_setting_connection(NMConnection* connection) {
+    return LibnmWraps::getInstance().nm_connection_get_setting_connection(connection);
+}
+
+extern "C" const char* __wrap_nm_setting_connection_get_interface_name(NMSettingConnection* setting) {
+    return LibnmWraps::getInstance().nm_setting_connection_get_interface_name(setting);
+}
+
+extern "C" NMIPConfig* __wrap_nm_active_connection_get_ip4_config(NMActiveConnection* connection) {
+    return LibnmWraps::getInstance().nm_active_connection_get_ip4_config(connection);
+}
+
+extern "C" NMIPConfig* __wrap_nm_active_connection_get_ip6_config(NMActiveConnection* connection) {
+    return LibnmWraps::getInstance().nm_active_connection_get_ip6_config(connection);
+}
+
+extern "C" GPtrArray* __wrap_nm_ip_config_get_addresses(NMIPConfig* config) {
+    return LibnmWraps::getInstance().nm_ip_config_get_addresses(config);
+}
+
+extern "C" const char* __wrap_nm_ip_address_get_address(NMIPAddress* address) {
+    return LibnmWraps::getInstance().nm_ip_address_get_address(address);
+}
+
+extern "C" guint __wrap_nm_ip_address_get_prefix(NMIPAddress* address) {
+    return LibnmWraps::getInstance().nm_ip_address_get_prefix(address);
+}
+
+extern "C" const char* __wrap_nm_ip_config_get_gateway(NMIPConfig* config) {
+    return LibnmWraps::getInstance().nm_ip_config_get_gateway(config);
+}
+
+extern "C" const char* const* __wrap_nm_ip_config_get_nameservers(NMIPConfig* config) {
+    return LibnmWraps::getInstance().nm_ip_config_get_nameservers(config);
+}
+
+extern "C" NMDhcpConfig* __wrap_nm_active_connection_get_dhcp4_config(NMActiveConnection* connection) {
+    return LibnmWraps::getInstance().nm_active_connection_get_dhcp4_config(connection);
+}
+
+extern "C" NMDhcpConfig* __wrap_nm_active_connection_get_dhcp6_config(NMActiveConnection* connection) {
+    return LibnmWraps::getInstance().nm_active_connection_get_dhcp6_config(connection);
+}
+
+extern "C" const char* __wrap_nm_dhcp_config_get_one_option(NMDhcpConfig* config, const char* option) {
+    return LibnmWraps::getInstance().nm_dhcp_config_get_one_option(config, option);
+}
+
 LibnmWrapsImpl* LibnmWraps::impl = nullptr;
 LibnmWraps::LibnmWraps() {}
 
@@ -85,6 +149,11 @@ const GPtrArray* LibnmWraps::nm_client_get_devices(NMClient* client) {
     return impl->nm_client_get_devices(client);
 }
 
+const GPtrArray* LibnmWraps::nm_client_get_active_connections(NMClient* client) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_client_get_active_connections(client);
+}
+
 NMClient* LibnmWraps::nm_client_new(GCancellable* cancellable, GError** error) {
     EXPECT_NE(impl, nullptr);
     return impl->nm_client_new(cancellable, error);
@@ -93,4 +162,79 @@ NMClient* LibnmWraps::nm_client_new(GCancellable* cancellable, GError** error) {
 const char* LibnmWraps::nm_device_get_hw_address(NMDevice* device) {
     EXPECT_NE(impl, nullptr);
     return impl->nm_device_get_hw_address(device);
+}
+
+NMSettingIPConfig* LibnmWraps::nm_connection_get_setting_ip4_config(NMConnection* connection) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_connection_get_setting_ip4_config(connection);
+}
+
+NMSettingIPConfig* LibnmWraps::nm_connection_get_setting_ip6_config(NMConnection* connection) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_connection_get_setting_ip6_config(connection);
+}
+
+const char* LibnmWraps::nm_setting_ip_config_get_method(NMSettingIPConfig* setting) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_setting_ip_config_get_method(setting);
+}
+
+NMSettingConnection* LibnmWraps::nm_connection_get_setting_connection(NMConnection* connection) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_connection_get_setting_connection(connection);
+}
+
+const char* LibnmWraps::nm_setting_connection_get_interface_name(NMSettingConnection* setting) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_setting_connection_get_interface_name(setting);
+}
+
+NMIPConfig* LibnmWraps::nm_active_connection_get_ip4_config(NMActiveConnection* connection) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_active_connection_get_ip4_config(connection);
+}
+
+NMIPConfig* LibnmWraps::nm_active_connection_get_ip6_config(NMActiveConnection* connection) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_active_connection_get_ip6_config(connection);
+}
+
+GPtrArray* LibnmWraps::nm_ip_config_get_addresses(NMIPConfig* config) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_ip_config_get_addresses(config);
+}
+
+const char* LibnmWraps::nm_ip_address_get_address(NMIPAddress* address) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_ip_address_get_address(address);
+}
+
+guint LibnmWraps::nm_ip_address_get_prefix(NMIPAddress* address) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_ip_address_get_prefix(address);
+}
+
+const char* LibnmWraps::nm_ip_config_get_gateway(NMIPConfig* config) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_ip_config_get_gateway(config);
+}
+
+const char* const* LibnmWraps::nm_ip_config_get_nameservers(NMIPConfig* config) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_ip_config_get_nameservers(config);
+}
+
+NMDhcpConfig* LibnmWraps::nm_active_connection_get_dhcp4_config(NMActiveConnection* connection) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_active_connection_get_dhcp4_config(connection);
+}
+
+NMDhcpConfig* LibnmWraps::nm_active_connection_get_dhcp6_config(NMActiveConnection* connection) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_active_connection_get_dhcp6_config(connection);
+}
+
+const char* LibnmWraps::nm_dhcp_config_get_one_option(NMDhcpConfig* config, const char* option) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_dhcp_config_get_one_option(config, option);
 }

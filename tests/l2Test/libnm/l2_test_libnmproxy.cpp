@@ -496,3 +496,414 @@ TEST_F(NetworkManagerTest, GetAvailableInterfaces_disabled)
     g_object_unref(wifiDevice);
     g_ptr_array_free(fakeDevices, TRUE);
 }
+
+TEST_F(NetworkManagerTest, GetIPSettings_unknown_iface)
+{
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"eth1\"}"), response));
+    EXPECT_TRUE(response.find("\"success\":false") != std::string::npos);
+}
+
+TEST_F(NetworkManagerTest, GetIPSettings_invalidDevice)
+{
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(NULL)));
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"eth0\"}"), response));
+    EXPECT_TRUE(response.find("\"success\":false") != std::string::npos);
+}
+
+TEST_F(NetworkManagerTest, GetIPSettings_invalid_state)
+{
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNMANAGED));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"eth0\"}"), response));
+    EXPECT_TRUE(response.find("\"success\":false") != std::string::npos);
+}
+
+TEST_F(NetworkManagerTest, GetIPSettings_interface_Empty)
+{
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100172)))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(reinterpret_cast<NMDevice*>(0x100178)))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNAVAILABLE));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"\"}"), response));
+    EXPECT_TRUE(response.find("\"success\":false") != std::string::npos);
+}
+
+TEST_F(NetworkManagerTest, GetIPSettings_GetPrimary_failed)
+{
+    // EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+    //     .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100172)))
+    //     .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    // EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(reinterpret_cast<NMDevice*>(0x100178)))
+    //     .WillOnce(::testing::Return(NM_DEVICE_STATE_UNAVAILABLE));
+
+    NMActiveConnection *dummyActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    NMRemoteConnection *dummyRemoteConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_primary_connection(::testing::_))
+        .WillOnce(::testing::Return(dummyActiveConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(dummyActiveConn))
+            .WillOnce(::testing::Return(dummyRemoteConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_interface_name(dummyRemoteConn))
+        .WillOnce(::testing::Return("unknown"));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"\"}"), response));
+    EXPECT_TRUE(response.find("\"success\":true") != std::string::npos);
+
+    g_object_unref(dummyActiveConn);
+    g_object_unref(dummyRemoteConn);
+}
+
+TEST_F(NetworkManagerTest, GetIPSettings_Invalid_ActiveConnection)
+{
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_active_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(NULL)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"eth0\"}"), response));
+    EXPECT_TRUE(response.find("\"success\":false") != std::string::npos);
+}
+
+TEST_F(NetworkManagerTest, GetIPSettings_Invalid_Connection)
+{
+    GPtrArray* dummyActiveConn = g_ptr_array_new();
+    NMActiveConnection *nullConnection = static_cast<NMActiveConnection*>(NULL);
+    NMActiveConnection *ethActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    g_ptr_array_add(dummyActiveConn, nullConnection);
+    g_ptr_array_add(dummyActiveConn, ethActiveConn);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMRemoteConnection*>(NULL)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_active_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyActiveConn)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"eth0\"}"), response));
+    EXPECT_TRUE(response.find("\"success\":false") != std::string::npos);
+
+    g_object_unref(ethActiveConn);
+    g_ptr_array_free(dummyActiveConn, TRUE);
+}
+
+TEST_F(NetworkManagerTest, GetIPSettings_valid_ConnectionSettingsEmpty)
+{
+    GPtrArray* dummyActiveConn = g_ptr_array_new();
+    NMActiveConnection *ethActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    NMRemoteConnection* retConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    g_ptr_array_add(dummyActiveConn, ethActiveConn);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_connection(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingConnection*>(NULL)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(::testing::_))
+        .WillOnce(::testing::Return(retConn));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_active_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyActiveConn)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"eth0\"}"), response));
+    EXPECT_TRUE(response.find("\"success\":false") != std::string::npos);
+
+    g_object_unref(ethActiveConn);
+    g_ptr_array_free(dummyActiveConn, TRUE);
+}
+
+TEST_F(NetworkManagerTest, GetIPSettings_ipv4_config)
+{
+    GPtrArray* dummyActiveConn = g_ptr_array_new();
+    NMActiveConnection *ethActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    NMRemoteConnection* retConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    g_ptr_array_add(dummyActiveConn, ethActiveConn);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_ip4_config(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMIPConfig*>(NULL)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_setting_connection_get_interface_name(::testing::_))
+        .WillOnce(::testing::Return("eth0"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_connection(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingConnection*>(0x100173)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(::testing::_))
+        .WillOnce(::testing::Return(retConn))
+        .WillOnce(::testing::Return(reinterpret_cast<NMRemoteConnection*>(NULL)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_active_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyActiveConn)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"eth0\"}"), response));
+    std::string expectedResponse =
+        _T("{\"interface\":\"eth0\",\"ipversion\":\"IPv4\",\"autoconfig\":true,\"success\":true}");
+    EXPECT_EQ(response, expectedResponse);
+
+    g_object_unref(ethActiveConn);
+    g_ptr_array_free(dummyActiveConn, TRUE);
+}
+
+TEST_F(NetworkManagerTest, GetIPSettings_ipv4_configAutoConftrue)
+{
+    GPtrArray* dummyActiveConn = g_ptr_array_new();
+    NMActiveConnection *ethActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    NMRemoteConnection* retConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    g_ptr_array_add(dummyActiveConn, ethActiveConn);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_ip4_config(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMIPConfig*>(NULL)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_setting_connection_get_interface_name(::testing::_))
+        .WillOnce(::testing::Return("eth0"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_connection(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingConnection*>(0x100173)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_setting_ip_config_get_method(::testing::_))
+        .WillOnce(::testing::Return("auto"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_ip4_config(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingIPConfig*>(0x100173)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(::testing::_))
+        .WillOnce(::testing::Return(retConn))
+        .WillOnce(::testing::Return(reinterpret_cast<NMRemoteConnection*>(retConn)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_active_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyActiveConn)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"eth0\"}"), response));
+    std::string expectedResponse =
+        _T("{\"interface\":\"eth0\",\"ipversion\":\"IPv4\",\"autoconfig\":true,\"success\":true}");
+    EXPECT_EQ(response, expectedResponse);
+
+    g_object_unref(ethActiveConn);
+    g_ptr_array_free(dummyActiveConn, TRUE);
+}
+
+TEST_F(NetworkManagerTest, GetIPSettings_ipv4_configAutoConfNull)
+{
+    GPtrArray* dummyActiveConn = g_ptr_array_new();
+    NMActiveConnection *ethActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    NMRemoteConnection* retConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    g_ptr_array_add(dummyActiveConn, ethActiveConn);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_ip4_config(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMIPConfig*>(NULL)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_setting_connection_get_interface_name(::testing::_))
+        .WillOnce(::testing::Return("eth0"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_connection(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingConnection*>(0x100173)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_setting_ip_config_get_method(::testing::_))
+        .WillOnce(::testing::Return("not auto"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_ip4_config(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingIPConfig*>(0x100173)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(::testing::_))
+        .WillOnce(::testing::Return(retConn))
+        .WillOnce(::testing::Return(reinterpret_cast<NMRemoteConnection*>(retConn)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_active_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyActiveConn)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"eth0\"}"), response));
+    std::string expectedResponse =
+        _T("{\"interface\":\"eth0\",\"ipversion\":\"IPv4\",\"autoconfig\":true,\"success\":true}");
+    EXPECT_EQ(response, expectedResponse);
+
+    g_object_unref(ethActiveConn);
+    g_ptr_array_free(dummyActiveConn, TRUE);
+}
+
+TEST_F(NetworkManagerTest, GetIPSettings_ipv4_config_valid)
+{
+    NMActiveConnection *ethActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    NMRemoteConnection* retConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    NMIPAddress* ipv4Addr = static_cast<NMIPAddress*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+
+    GPtrArray* dummyActiveConn = g_ptr_array_new();
+    GPtrArray* ipvAddr = g_ptr_array_new();
+    g_ptr_array_add(dummyActiveConn, ethActiveConn);
+    g_ptr_array_add(ipvAddr, ipv4Addr);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_dhcp_config_get_one_option(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return("192.168.1.11"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_dhcp4_config(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDhcpConfig*>(0x100170)));
+
+    const char* fakeDnsServers[] = {"8.8.8.8", "8.8.4.4", nullptr};
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_ip_config_get_nameservers(::testing::_))
+        .WillOnce(::testing::Return(fakeDnsServers));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_ip_config_get_gateway(::testing::_))
+        .WillOnce(::testing::Return("192.168.1.0"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_ip_address_get_address(::testing::_))
+        .WillOnce(::testing::Return("192.168.1.2"))
+        .WillOnce(::testing::Return("192.168.1.2"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_ip_config_get_addresses(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(ipvAddr)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_ip4_config(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMIPConfig*>(0x100171)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_setting_connection_get_interface_name(::testing::_))
+        .WillOnce(::testing::Return("eth0"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_connection(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingConnection*>(0x100173)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(::testing::_))
+        .WillOnce(::testing::Return(retConn))
+        .WillOnce(::testing::Return(reinterpret_cast<NMRemoteConnection*>(NULL)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_active_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyActiveConn)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"eth0\"}"), response));
+
+    EXPECT_TRUE(response.find("\"success\":true") != std::string::npos);
+    EXPECT_TRUE(response.find("\"secondarydns\":\"8.8.4.4\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"primarydns\":\"8.8.8.8\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"interface\":\"eth0\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"ipaddress\":\"192.168.1.2\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"ula\":\"\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"dhcpserver\":\"192.168.1.11\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"gateway\":\"192.168.1.0\"") != std::string::npos);
+
+    g_object_unref(ethActiveConn);
+    g_object_unref(retConn);
+    g_object_unref(ipv4Addr);
+    g_ptr_array_free(dummyActiveConn, TRUE);
+    g_ptr_array_free(ipvAddr, TRUE);
+}
+
+TEST_F(NetworkManagerTest, GetIPSettings_ipv6_config_valid)
+{
+    NMActiveConnection *ethActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    NMRemoteConnection* retConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    NMIPAddress* ipv6Addr = static_cast<NMIPAddress*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+
+    GPtrArray* dummyActiveConn = g_ptr_array_new();
+    GPtrArray* ipvAddr = g_ptr_array_new();
+    g_ptr_array_add(dummyActiveConn, ethActiveConn);
+    g_ptr_array_add(ipvAddr, ipv6Addr);
+    g_ptr_array_add(ipvAddr, reinterpret_cast<NMIPAddress*>(0x100176));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_dhcp_config_get_one_option(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return("2001:db8::1"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_dhcp6_config(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDhcpConfig*>(0x100170)));
+
+    const char* fakeDnsServers[] = {"2001:4860:4860::8888", "2001:4860:4860::8844", nullptr};
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_ip_config_get_nameservers(::testing::_))
+        .WillOnce(::testing::Return(fakeDnsServers));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_ip_config_get_gateway(::testing::_))
+        .WillOnce(::testing::Return("2001:4860:4860::1"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_ip_address_get_prefix(::testing::_))
+        .WillOnce(::testing::Return(64));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_ip_address_get_address(::testing::_))
+        .WillOnce(::testing::Return("2001:db8:1:2:3:4:5:6"))
+        .WillOnce(::testing::Return("fe80::1234:5678:abcd:ef01"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_ip_config_get_addresses(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(ipvAddr)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_ip6_config(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMIPConfig*>(0x100171)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_setting_connection_get_interface_name(::testing::_))
+        .WillOnce(::testing::Return("eth0"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_connection(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingConnection*>(0x100173)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(::testing::_))
+        .WillOnce(::testing::Return(retConn))
+        .WillOnce(::testing::Return(reinterpret_cast<NMRemoteConnection*>(NULL)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_active_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyActiveConn)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"eth0\", \"ipversion\":\"IPv6\"}"), response));
+
+    EXPECT_TRUE(response.find("\"success\":true") != std::string::npos);
+    EXPECT_TRUE(response.find("\"ipversion\":\"IPv6\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"secondarydns\":\"2001:4860:4860::8844\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"primarydns\":\"2001:4860:4860::8888\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"interface\":\"eth0\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"ipaddress\":\"2001:db8:1:2:3:4:5:6\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"ula\":\"fe80::1234:5678:abcd:ef01\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"prefix\":64") != std::string::npos);
+    EXPECT_TRUE(response.find("\"dhcpserver\":\"2001:db8::1\"") != std::string::npos);
+    EXPECT_TRUE(response.find("\"gateway\":\"2001:4860:4860::1\"") != std::string::npos);
+
+    g_object_unref(ethActiveConn);
+    g_object_unref(retConn);
+    g_object_unref(ipv6Addr);
+    g_ptr_array_free(dummyActiveConn, TRUE);
+    g_ptr_array_free(ipvAddr, TRUE);
+}
