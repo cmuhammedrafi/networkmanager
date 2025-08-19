@@ -11,6 +11,8 @@ extern "C" NMRemoteConnection* __real_nm_active_connection_get_connection(NMActi
 extern "C" const char* __real_nm_connection_get_interface_name(NMRemoteConnection *connection);
 extern "C" NMDevice* __real_nm_client_get_device_by_iface(NMClient *client, const char *iface);
 extern "C" NMDeviceState __real_nm_device_get_state(NMDevice *device);
+extern "C" void __real_nm_device_disconnect_async(NMDevice *device, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data);
+extern "C" gboolean __real_nm_device_disconnect_finish(NMDevice *device, GAsyncResult *result, GError **error);
 extern "C" const GPtrArray* __real_nm_client_get_devices(NMClient* client);
 extern "C" NMClient* __real_nm_client_new(GCancellable* cancellable, GError** error);
 extern "C" const char* __real_nm_device_get_hw_address(NMDevice* device);
@@ -49,6 +51,23 @@ public:
             .WillByDefault(::testing::Invoke(
             [&](NMDevice* device) -> NMDeviceState {
                 return __real_nm_device_get_state(device);
+            }));
+        ON_CALL(*this, nm_device_disconnect_async(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMDevice* device, GCancellable* cancellable, GAsyncReadyCallback callback, gpointer user_data) {
+                // Call the callback function directly with dummy values
+                // if (callback) {
+                //     GObject* source_object = G_OBJECT(device);
+                //     GAsyncResult* result = nullptr; // In a real implementation, you'd create a GAsyncResult
+                //     callback(source_object, result, user_data);
+                // }
+                __real_nm_device_disconnect_async(device, cancellable, callback, user_data);
+            }));
+        
+        ON_CALL(*this, nm_device_disconnect_finish(::testing::_, ::testing::_, ::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMDevice* device, GAsyncResult* result, GError** error) -> gboolean {
+                return __real_nm_device_disconnect_finish(device, result, error);
             }));
         ON_CALL(*this, nm_client_get_primary_connection(::testing::_))
             .WillByDefault(::testing::Invoke(
@@ -168,6 +187,8 @@ public:
     MOCK_METHOD(const char*, nm_device_get_iface, (NMDevice* device), (override));
     MOCK_METHOD(NMDevice*, nm_client_get_device_by_iface, (NMClient *client, const char *iface), (override));
     MOCK_METHOD(NMDeviceState, nm_device_get_state, (NMDevice *device), (override));
+    MOCK_METHOD(void, nm_device_disconnect_async, (NMDevice *device, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data), (override));
+    MOCK_METHOD(gboolean, nm_device_disconnect_finish, (NMDevice *device, GAsyncResult *result, GError **error), (override));
     MOCK_METHOD(NMActiveConnection*, nm_client_get_primary_connection, (NMClient *client), (override));
     MOCK_METHOD(NMRemoteConnection*, nm_active_connection_get_connection, (NMActiveConnection *connection), (override));
     MOCK_METHOD(const char*, nm_connection_get_interface_name, (NMRemoteConnection *connection), (override));

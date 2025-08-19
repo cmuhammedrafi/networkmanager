@@ -21,7 +21,7 @@ extern "C" NMRemoteConnection* __wrap_nm_active_connection_get_connection(NMActi
     return LibnmWraps::getInstance().nm_active_connection_get_connection(connection);
 }
 
-extern "C" const char* __wrap_nm_connection_get_interface_name(NMRemoteConnection *connection) { // Changed to NMRemoteConnection*
+extern "C" const char* __wrap_nm_connection_get_interface_name(NMRemoteConnection *connection) {
     return LibnmWraps::getInstance().nm_connection_get_interface_name(connection);
 }
 
@@ -31,6 +31,14 @@ extern "C" NMDevice* __wrap_nm_client_get_device_by_iface(NMClient *client, cons
 
 extern "C" NMDeviceState __wrap_nm_device_get_state(NMDevice *device) {
     return LibnmWraps::getInstance().nm_device_get_state(device);
+}
+
+extern "C" void __wrap_nm_device_disconnect_async(NMDevice *device, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data) {
+    LibnmWraps::getInstance().nm_device_disconnect_async(device, cancellable, callback, user_data);
+}
+
+extern "C" gboolean __wrap_nm_device_disconnect_finish(NMDevice *device, GAsyncResult *result, GError **error) {
+    return LibnmWraps::getInstance().nm_device_disconnect_finish(device, result, error);
 }
 
 extern "C" const GPtrArray* __wrap_nm_client_get_devices(NMClient* client) {
@@ -142,6 +150,16 @@ NMDevice* LibnmWraps::nm_client_get_device_by_iface(NMClient *client, const char
 NMDeviceState LibnmWraps::nm_device_get_state(NMDevice *device) {
     EXPECT_NE(impl, nullptr);
     return impl->nm_device_get_state(device);
+}
+
+void LibnmWraps::nm_device_disconnect_async(NMDevice *device, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data) {
+    EXPECT_NE(impl, nullptr);
+    impl->nm_device_disconnect_async(device, cancellable, callback, user_data);
+}
+
+gboolean LibnmWraps::nm_device_disconnect_finish(NMDevice *device, GAsyncResult *result, GError **error) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_device_disconnect_finish(device, result, error);
 }
 
 const GPtrArray* LibnmWraps::nm_client_get_devices(NMClient* client) {

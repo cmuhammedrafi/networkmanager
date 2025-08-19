@@ -23,8 +23,7 @@ FetchContent_MakeAvailable(googletest)
 
 message("networkmanager building with libnm")
 add_executable(${NM_LIBNM_PROXY_L2_TEST}
-    ${CMAKE_SOURCE_DIR}/tests/l2Test/libnm/l2_test_libnmproxy.cpp
-    ${CMAKE_SOURCE_DIR}/tests/l2Test/libnm/l2_test_libnmproxyInit.cpp
+    ${CMAKE_SOURCE_DIR}/tests/l2Test/libnm/l2_test_libnmproxyWifi.cpp
     ${CMAKE_SOURCE_DIR}/tests/mocks/thunder/Module.cpp
     ${CMAKE_SOURCE_DIR}/tests/mocks/Wraps.cpp
     ${CMAKE_SOURCE_DIR}/tests/mocks/LibnmWraps.cpp
@@ -90,7 +89,7 @@ target_link_options(${NM_LIBNM_PROXY_L2_TEST} PRIVATE
     -Wl,-wrap,nm_device_get_state
     -Wl,-wrap,nm_client_get_devices
     -Wl,-wrap,nm_client_new
-     -Wl,-wrap,nm_device_get_hw_address
+    -Wl,-wrap,nm_device_get_hw_address
     -Wl,-wrap,nm_client_get_active_connections
     -Wl,-wrap,nm_connection_get_setting_connection
     -Wl,-wrap,nm_setting_connection_get_interface_name
@@ -107,6 +106,8 @@ target_link_options(${NM_LIBNM_PROXY_L2_TEST} PRIVATE
     -Wl,-wrap,nm_ip_config_get_gateway
     -Wl,-wrap,nm_ip_config_get_nameservers
     -Wl,-wrap,nm_dhcp_config_get_one_option
+    -Wl,-wrap,nm_device_disconnect_async
+    -Wl,-wrap,nm_device_disconnect_finish
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
