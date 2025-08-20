@@ -61,7 +61,7 @@ public:
                 //     GAsyncResult* result = nullptr; // In a real implementation, you'd create a GAsyncResult
                 //     callback(source_object, result, user_data);
                 // }
-                __real_nm_device_disconnect_async(device, cancellable, callback, user_data);
+                return __real_nm_device_disconnect_async(device, cancellable, callback, user_data);
             }));
         
         ON_CALL(*this, nm_device_disconnect_finish(::testing::_, ::testing::_, ::testing::_))

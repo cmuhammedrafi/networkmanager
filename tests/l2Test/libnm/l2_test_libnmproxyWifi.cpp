@@ -27,6 +27,7 @@
 #include "FactoriesImplementation.h"
 #include "WrapsMock.h"
 #include "LibnmWrapsMock.h"
+#include "GLibWrapsMock.h"
 #include "ServiceMock.h"
 #include "ThunderPortability.h"
 #include "COMLinkMock.h"
@@ -39,7 +40,7 @@
 using namespace WPEFramework;
 using ::testing::NiceMock;
 
-class NetworkManagerTest : public ::testing::Test {
+class NetworkManagerWifiTest : public ::testing::Test {
 protected:
     Core::ProxyType<Plugin::NetworkManager> plugin;
     Core::JSONRPC::Handler& handler;
@@ -50,6 +51,7 @@ protected:
 
     WrapsImplMock *p_wrapsImplMock = nullptr;
     LibnmWrapsImplMock *p_libnmWrapsImplMock = nullptr;
+    GLibWrapsImplMock *p_gLibWrapsImplMock = nullptr;
     Core::ProxyType<Plugin::NetworkManagerImplementation> NetworkManagerImpl;
 
     NiceMock<COMLinkMock> comLinkMock;
@@ -58,7 +60,7 @@ protected:
     Core::ProxyType<WorkerPoolImplementation> workerPool;
     NiceMock<FactoriesImplementation> factoriesImplementation;
 
-    NetworkManagerTest()
+    NetworkManagerWifiTest()
         : plugin(Core::ProxyType<Plugin::NetworkManager>::Create())
         , handler(*(plugin))
         , INIT_CONX(1, 0)
@@ -67,6 +69,9 @@ protected:
 
         p_libnmWrapsImplMock = new NiceMock <LibnmWrapsImplMock>;
         LibnmWraps::setImpl(p_libnmWrapsImplMock);
+
+        p_gLibWrapsImplMock = new NiceMock <GLibWrapsImplMock>;
+        GLibWraps::setImpl(p_gLibWrapsImplMock);
 
         p_wrapsImplMock = new NiceMock <WrapsImplMock>;
         Wraps::setImpl(p_wrapsImplMock);
@@ -145,7 +150,7 @@ protected:
         }
     }
 
-    virtual ~NetworkManagerTest() override
+    virtual ~NetworkManagerWifiTest() override
     {
         plugin->Deinitialize(&service);
         dispatcher->Deactivate();
@@ -167,10 +172,17 @@ protected:
             delete p_libnmWrapsImplMock;
             p_libnmWrapsImplMock = nullptr;
         }
+
+        GLibWraps::setImpl(nullptr);
+        if (p_gLibWrapsImplMock != nullptr)
+        {
+            delete p_gLibWrapsImplMock;
+            p_gLibWrapsImplMock = nullptr;
+        }
     }
 };
 
-TEST_F(NetworkManagerTest, RegisteredMethods)
+TEST_F(NetworkManagerWifiTest, RegisteredMethods)
 {
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("SetLogLevel")));
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("GetLogLevel")));
@@ -195,7 +207,7 @@ TEST_F(NetworkManagerTest, RegisteredMethods)
     EXPECT_EQ(Core::ERROR_NONE, handler.Exists(_T("GetSupportedSecurityModes")));
 }
 
-TEST_F(NetworkManagerTest, get_wifi_device_devices_null)
+TEST_F(NetworkManagerWifiTest, get_wifi_device_devices_null)
 {
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
         .WillRepeatedly(::testing::Return(reinterpret_cast<GPtrArray*>(NULL)));
@@ -204,7 +216,7 @@ TEST_F(NetworkManagerTest, get_wifi_device_devices_null)
     EXPECT_EQ(response, _T("{\"success\":true}"));
 }
 
-TEST_F(NetworkManagerTest, WiFiAlreadyDisconnected)
+TEST_F(NetworkManagerWifiTest, WiFiAlreadyDisconnected)
 {
     GPtrArray* fakeDevices = g_ptr_array_new();
     NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
@@ -212,7 +224,7 @@ TEST_F(NetworkManagerTest, WiFiAlreadyDisconnected)
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
         .WillRepeatedly(::testing::Return(fakeDevices));
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
-        .WillOnce(::testing::Return("wlan0"));
+        .WillRepeatedly(::testing::Return("wlan0"));
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
         .WillOnce(::testing::Return(NM_DEVICE_STATE_DISCONNECTED))
         .WillOnce(::testing::Return(NM_DEVICE_STATE_DISCONNECTED));
@@ -224,7 +236,7 @@ TEST_F(NetworkManagerTest, WiFiAlreadyDisconnected)
     g_ptr_array_free(fakeDevices, TRUE);
 }
 
-TEST_F(NetworkManagerTest, WiFiAlreadyConnected)
+TEST_F(NetworkManagerWifiTest, WiFiAlreadyConnected_failed)
 {
     GPtrArray* fakeDevices = g_ptr_array_new();
     NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
@@ -232,11 +244,14 @@ TEST_F(NetworkManagerTest, WiFiAlreadyConnected)
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
         .WillRepeatedly(::testing::Return(fakeDevices));
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
-        .WillOnce(::testing::Return("wlan0"))
-        .WillOnce(::testing::Return("wlan0"));
+        .WillRepeatedly(::testing::Return("wlan0"));
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
         .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED))
         .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    EXPECT_CALL(*p_gLibWrapsImplMock, g_main_loop_is_running(::testing::_))
+        .WillOnce(::testing::Return(true))
+        .WillOnce(::testing::Return(true));
 
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_disconnect_finish(::testing::_, ::testing::_, ::testing::_))
         .WillOnce(::testing::Return(false));
@@ -252,6 +267,41 @@ TEST_F(NetworkManagerTest, WiFiAlreadyConnected)
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("WiFiDisconnect"), _T(""), response));
     EXPECT_EQ(response, _T("{\"success\":false}"));
+
+    g_object_unref(deviceDummy);
+    g_ptr_array_free(fakeDevices, TRUE);
+}
+
+TEST_F(NetworkManagerWifiTest, WiFiAlreadyConnected_success)
+{
+    GPtrArray* fakeDevices = g_ptr_array_new();
+    NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
+    g_ptr_array_add(fakeDevices, deviceDummy);
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillRepeatedly(::testing::Return(fakeDevices));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
+        .WillRepeatedly(::testing::Return("wlan0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+    EXPECT_CALL(*p_gLibWrapsImplMock, g_main_loop_is_running(::testing::_))
+        .WillOnce(::testing::Return(true))
+        .WillOnce(::testing::Return(true));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_disconnect_finish(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(true));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_disconnect_async(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](NMDevice *device, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data) {
+                if (callback) {
+                    GObject* source_object = G_OBJECT(device);
+                    GAsyncResult* result = nullptr;
+                    callback(source_object, result, user_data);
+                }
+        }));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("WiFiDisconnect"), _T(""), response));
+    EXPECT_EQ(response, _T("{\"success\":true}"));
 
     g_object_unref(deviceDummy);
     g_ptr_array_free(fakeDevices, TRUE);

@@ -24,9 +24,12 @@ FetchContent_MakeAvailable(googletest)
 message("networkmanager building with libnm")
 add_executable(${NM_LIBNM_PROXY_L2_TEST}
     ${CMAKE_SOURCE_DIR}/tests/l2Test/libnm/l2_test_libnmproxyWifi.cpp
+    ${CMAKE_SOURCE_DIR}/tests/l2Test/libnm/l2_test_libnmproxyInit.cpp
+    ${CMAKE_SOURCE_DIR}/tests/l2Test/libnm/l2_test_libnmproxy.cpp
     ${CMAKE_SOURCE_DIR}/tests/mocks/thunder/Module.cpp
     ${CMAKE_SOURCE_DIR}/tests/mocks/Wraps.cpp
     ${CMAKE_SOURCE_DIR}/tests/mocks/LibnmWraps.cpp
+    ${CMAKE_SOURCE_DIR}/tests/mocks/GLibWraps.cpp
     ${CMAKE_SOURCE_DIR}/plugin/NetworkManager.cpp
     ${CMAKE_SOURCE_DIR}/plugin/NetworkManagerLogger.cpp
     ${CMAKE_SOURCE_DIR}/plugin/NetworkManagerJsonRpc.cpp
@@ -108,6 +111,7 @@ target_link_options(${NM_LIBNM_PROXY_L2_TEST} PRIVATE
     -Wl,-wrap,nm_dhcp_config_get_one_option
     -Wl,-wrap,nm_device_disconnect_async
     -Wl,-wrap,nm_device_disconnect_finish
+    -Wl,-wrap,g_main_loop_is_running
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
