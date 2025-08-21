@@ -109,6 +109,47 @@ extern "C" const char* __wrap_nm_dhcp_config_get_one_option(NMDhcpConfig* config
     return LibnmWraps::getInstance().nm_dhcp_config_get_one_option(config, option);
 }
 
+// Access Point API wrappers
+extern "C" NM80211ApFlags __wrap_nm_access_point_get_flags(NMAccessPoint *ap) {
+    return LibnmWraps::getInstance().nm_access_point_get_flags(ap);
+}
+
+extern "C" NM80211ApSecurityFlags __wrap_nm_access_point_get_wpa_flags(NMAccessPoint *ap) {
+    return LibnmWraps::getInstance().nm_access_point_get_wpa_flags(ap);
+}
+
+extern "C" NM80211ApSecurityFlags __wrap_nm_access_point_get_rsn_flags(NMAccessPoint *ap) {
+    return LibnmWraps::getInstance().nm_access_point_get_rsn_flags(ap);
+}
+
+extern "C" GBytes* __wrap_nm_access_point_get_ssid(NMAccessPoint *ap) {
+    return LibnmWraps::getInstance().nm_access_point_get_ssid(ap);
+}
+
+extern "C" const char* __wrap_nm_access_point_get_bssid(NMAccessPoint *ap) {
+    return LibnmWraps::getInstance().nm_access_point_get_bssid(ap);
+}
+
+extern "C" guint32 __wrap_nm_access_point_get_frequency(NMAccessPoint *ap) {
+    return LibnmWraps::getInstance().nm_access_point_get_frequency(ap);
+}
+
+extern "C" NM80211Mode __wrap_nm_access_point_get_mode(NMAccessPoint *ap) {
+    return LibnmWraps::getInstance().nm_access_point_get_mode(ap);
+}
+
+extern "C" guint32 __wrap_nm_access_point_get_max_bitrate(NMAccessPoint *ap) {
+    return LibnmWraps::getInstance().nm_access_point_get_max_bitrate(ap);
+}
+
+extern "C" guint8 __wrap_nm_access_point_get_strength(NMAccessPoint *ap) {
+    return LibnmWraps::getInstance().nm_access_point_get_strength(ap);
+}
+
+extern "C" NMAccessPoint* __wrap_nm_device_wifi_get_active_access_point(NMDeviceWifi *device) {
+    return LibnmWraps::getInstance().nm_device_wifi_get_active_access_point(device);
+}
+
 LibnmWrapsImpl* LibnmWraps::impl = nullptr;
 LibnmWraps::LibnmWraps() {}
 
@@ -255,4 +296,55 @@ NMDhcpConfig* LibnmWraps::nm_active_connection_get_dhcp6_config(NMActiveConnecti
 const char* LibnmWraps::nm_dhcp_config_get_one_option(NMDhcpConfig* config, const char* option) {
     EXPECT_NE(impl, nullptr);
     return impl->nm_dhcp_config_get_one_option(config, option);
+}
+
+// Access Point API implementation
+NM80211ApFlags LibnmWraps::nm_access_point_get_flags(NMAccessPoint *ap) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_access_point_get_flags(ap);
+}
+
+NM80211ApSecurityFlags LibnmWraps::nm_access_point_get_wpa_flags(NMAccessPoint *ap) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_access_point_get_wpa_flags(ap);
+}
+
+NM80211ApSecurityFlags LibnmWraps::nm_access_point_get_rsn_flags(NMAccessPoint *ap) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_access_point_get_rsn_flags(ap);
+}
+
+GBytes* LibnmWraps::nm_access_point_get_ssid(NMAccessPoint *ap) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_access_point_get_ssid(ap);
+}
+
+const char* LibnmWraps::nm_access_point_get_bssid(NMAccessPoint *ap) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_access_point_get_bssid(ap);
+}
+
+guint32 LibnmWraps::nm_access_point_get_frequency(NMAccessPoint *ap) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_access_point_get_frequency(ap);
+}
+
+NM80211Mode LibnmWraps::nm_access_point_get_mode(NMAccessPoint *ap) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_access_point_get_mode(ap);
+}
+
+guint32 LibnmWraps::nm_access_point_get_max_bitrate(NMAccessPoint *ap) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_access_point_get_max_bitrate(ap);
+}
+
+guint8 LibnmWraps::nm_access_point_get_strength(NMAccessPoint *ap) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_access_point_get_strength(ap);
+}
+
+NMAccessPoint* LibnmWraps::nm_device_wifi_get_active_access_point(NMDeviceWifi *device) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_device_wifi_get_active_access_point(device);
 }

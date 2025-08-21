@@ -36,6 +36,18 @@ public:
     virtual NMDhcpConfig* nm_active_connection_get_dhcp4_config(NMActiveConnection* connection) = 0;
     virtual NMDhcpConfig* nm_active_connection_get_dhcp6_config(NMActiveConnection* connection) = 0;
     virtual const char* nm_dhcp_config_get_one_option(NMDhcpConfig* config, const char* option) = 0;
+    
+    // Access Point APIs
+    virtual NM80211ApFlags nm_access_point_get_flags(NMAccessPoint *ap) = 0;
+    virtual NM80211ApSecurityFlags nm_access_point_get_wpa_flags(NMAccessPoint *ap) = 0;
+    virtual NM80211ApSecurityFlags nm_access_point_get_rsn_flags(NMAccessPoint *ap) = 0;
+    virtual GBytes* nm_access_point_get_ssid(NMAccessPoint *ap) = 0;
+    virtual const char* nm_access_point_get_bssid(NMAccessPoint *ap) = 0;
+    virtual guint32 nm_access_point_get_frequency(NMAccessPoint *ap) = 0;
+    virtual NM80211Mode nm_access_point_get_mode(NMAccessPoint *ap) = 0;
+    virtual guint32 nm_access_point_get_max_bitrate(NMAccessPoint *ap) = 0;
+    virtual guint8 nm_access_point_get_strength(NMAccessPoint *ap) = 0;
+    virtual NMAccessPoint* nm_device_wifi_get_active_access_point(NMDeviceWifi *device) = 0;
 };
 
 class LibnmWraps {
@@ -75,4 +87,16 @@ public:
     static NMDhcpConfig* nm_active_connection_get_dhcp4_config(NMActiveConnection* connection);
     static NMDhcpConfig* nm_active_connection_get_dhcp6_config(NMActiveConnection* connection);
     static const char* nm_dhcp_config_get_one_option(NMDhcpConfig* config, const char* option);
+    
+    // Access Point APIs
+    static NM80211ApFlags nm_access_point_get_flags(NMAccessPoint *ap);
+    static NM80211ApSecurityFlags nm_access_point_get_wpa_flags(NMAccessPoint *ap);
+    static NM80211ApSecurityFlags nm_access_point_get_rsn_flags(NMAccessPoint *ap);
+    static GBytes* nm_access_point_get_ssid(NMAccessPoint *ap);
+    static const char* nm_access_point_get_bssid(NMAccessPoint *ap);
+    static guint32 nm_access_point_get_frequency(NMAccessPoint *ap);
+    static NM80211Mode nm_access_point_get_mode(NMAccessPoint *ap);
+    static guint32 nm_access_point_get_max_bitrate(NMAccessPoint *ap);
+    static guint8 nm_access_point_get_strength(NMAccessPoint *ap);
+    static NMAccessPoint* nm_device_wifi_get_active_access_point(NMDeviceWifi *device);
 };

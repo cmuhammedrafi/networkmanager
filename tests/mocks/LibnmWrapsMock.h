@@ -33,6 +33,18 @@ extern "C" NMDhcpConfig* __real_nm_active_connection_get_dhcp4_config(NMActiveCo
 extern "C" NMDhcpConfig* __real_nm_active_connection_get_dhcp6_config(NMActiveConnection* connection);
 extern "C" const char* __real_nm_dhcp_config_get_one_option(NMDhcpConfig* config, const char* option);
 
+// Access Point API real functions
+extern "C" NM80211ApFlags __real_nm_access_point_get_flags(NMAccessPoint *ap);
+extern "C" NM80211ApSecurityFlags __real_nm_access_point_get_wpa_flags(NMAccessPoint *ap);
+extern "C" NM80211ApSecurityFlags __real_nm_access_point_get_rsn_flags(NMAccessPoint *ap);
+extern "C" GBytes* __real_nm_access_point_get_ssid(NMAccessPoint *ap);
+extern "C" const char* __real_nm_access_point_get_bssid(NMAccessPoint *ap);
+extern "C" guint32 __real_nm_access_point_get_frequency(NMAccessPoint *ap);
+extern "C" NM80211Mode __real_nm_access_point_get_mode(NMAccessPoint *ap);
+extern "C" guint32 __real_nm_access_point_get_max_bitrate(NMAccessPoint *ap);
+extern "C" guint8 __real_nm_access_point_get_strength(NMAccessPoint *ap);
+extern "C" NMAccessPoint* __real_nm_device_wifi_get_active_access_point(NMDeviceWifi *device);
+
 class LibnmWrapsImplMock : public LibnmWrapsImpl {
 public:
     LibnmWrapsImplMock() : LibnmWrapsImpl() {
@@ -179,6 +191,67 @@ public:
             [&](NMDhcpConfig* config, const char* option) -> const char* {
                 return __real_nm_dhcp_config_get_one_option(config, option);
             }));
+            
+        // Access Point API ON_CALL setups
+        ON_CALL(*this, nm_access_point_get_flags(::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMAccessPoint* ap) -> NM80211ApFlags {
+                return __real_nm_access_point_get_flags(ap);
+            }));
+            
+        ON_CALL(*this, nm_access_point_get_wpa_flags(::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMAccessPoint* ap) -> NM80211ApSecurityFlags {
+                return __real_nm_access_point_get_wpa_flags(ap);
+            }));
+            
+        ON_CALL(*this, nm_access_point_get_rsn_flags(::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMAccessPoint* ap) -> NM80211ApSecurityFlags {
+                return __real_nm_access_point_get_rsn_flags(ap);
+            }));
+            
+        ON_CALL(*this, nm_access_point_get_ssid(::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMAccessPoint* ap) -> GBytes* {
+                return __real_nm_access_point_get_ssid(ap);
+            }));
+            
+        ON_CALL(*this, nm_access_point_get_bssid(::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMAccessPoint* ap) -> const char* {
+                return __real_nm_access_point_get_bssid(ap);
+            }));
+            
+        ON_CALL(*this, nm_access_point_get_frequency(::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMAccessPoint* ap) -> guint32 {
+                return __real_nm_access_point_get_frequency(ap);
+            }));
+            
+        ON_CALL(*this, nm_access_point_get_mode(::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMAccessPoint* ap) -> NM80211Mode {
+                return __real_nm_access_point_get_mode(ap);
+            }));
+            
+        ON_CALL(*this, nm_access_point_get_max_bitrate(::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMAccessPoint* ap) -> guint32 {
+                return __real_nm_access_point_get_max_bitrate(ap);
+            }));
+            
+        ON_CALL(*this, nm_access_point_get_strength(::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMAccessPoint* ap) -> guint8 {
+                return __real_nm_access_point_get_strength(ap);
+            }));
+            
+        ON_CALL(*this, nm_device_wifi_get_active_access_point(::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMDeviceWifi* device) -> NMAccessPoint* {
+                return __real_nm_device_wifi_get_active_access_point(device);
+            }));
     }
 
     virtual ~LibnmWrapsImplMock() = default;
@@ -211,5 +284,16 @@ public:
     MOCK_METHOD(const char* const*, nm_ip_config_get_nameservers, (NMIPConfig* config), (override));
     MOCK_METHOD(NMDhcpConfig*, nm_active_connection_get_dhcp4_config, (NMActiveConnection* connection), (override));
     MOCK_METHOD(const char*, nm_dhcp_config_get_one_option, (NMDhcpConfig* config, const char* option), (override));
-};
 
+    // Access Point API mock methods
+    MOCK_METHOD(NM80211ApFlags, nm_access_point_get_flags, (NMAccessPoint *ap), (override));
+    MOCK_METHOD(NM80211ApSecurityFlags, nm_access_point_get_wpa_flags, (NMAccessPoint *ap), (override));
+    MOCK_METHOD(NM80211ApSecurityFlags, nm_access_point_get_rsn_flags, (NMAccessPoint *ap), (override));
+    MOCK_METHOD(GBytes*, nm_access_point_get_ssid, (NMAccessPoint *ap), (override));
+    MOCK_METHOD(const char*, nm_access_point_get_bssid, (NMAccessPoint *ap), (override));
+    MOCK_METHOD(guint32, nm_access_point_get_frequency, (NMAccessPoint *ap), (override));
+    MOCK_METHOD(NM80211Mode, nm_access_point_get_mode, (NMAccessPoint *ap), (override));
+    MOCK_METHOD(guint32, nm_access_point_get_max_bitrate, (NMAccessPoint *ap), (override));
+    MOCK_METHOD(guint8, nm_access_point_get_strength, (NMAccessPoint *ap), (override));
+    MOCK_METHOD(NMAccessPoint*, nm_device_wifi_get_active_access_point, (NMDeviceWifi *device), (override));
+};

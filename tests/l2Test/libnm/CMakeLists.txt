@@ -112,6 +112,16 @@ target_link_options(${NM_LIBNM_PROXY_L2_TEST} PRIVATE
     -Wl,-wrap,nm_device_disconnect_async
     -Wl,-wrap,nm_device_disconnect_finish
     -Wl,-wrap,g_main_loop_is_running
+    -Wl,-wrap,nm_access_point_get_flags
+    -Wl,-wrap,nm_access_point_get_wpa_flags
+    -Wl,-wrap,nm_access_point_get_rsn_flags
+    -Wl,-wrap,nm_access_point_get_ssid
+    -Wl,-wrap,nm_access_point_get_bssid
+    -Wl,-wrap,nm_access_point_get_frequency
+    -Wl,-wrap,nm_access_point_get_mode
+    -Wl,-wrap,nm_access_point_get_max_bitrate
+    -Wl,-wrap,nm_access_point_get_strength
+    -Wl,-wrap,nm_device_wifi_get_active_access_point
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
