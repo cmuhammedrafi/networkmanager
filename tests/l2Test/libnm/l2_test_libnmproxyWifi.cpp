@@ -614,6 +614,26 @@ TEST_F(NetworkManagerWifiTest, GetWifiState_Pairing)
     g_ptr_array_free(fakeDevices, TRUE);
 }
 
+TEST_F(NetworkManagerWifiTest, GetWifiState_unknown)
+{
+    GPtrArray* fakeDevices = g_ptr_array_new();
+    NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
+    g_ptr_array_add(fakeDevices, deviceDummy);
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillRepeatedly(::testing::Return(fakeDevices));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
+        .WillRepeatedly(::testing::Return("wlan0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_NEED_AUTH))
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNKNOWN));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetWifiState"), _T(""), response));
+    EXPECT_EQ(response, _T("{\"state\":1,\"status\":\"WIFI_STATE_DISABLED\",\"success\":true}"));
+
+    g_object_unref(deviceDummy);
+    g_ptr_array_free(fakeDevices, TRUE);
+}
+
 TEST_F(NetworkManagerWifiTest, GetWifiState_Connecting)
 {
     GPtrArray* fakeDevices = g_ptr_array_new();
@@ -644,11 +664,10 @@ TEST_F(NetworkManagerWifiTest, GetWifiState_Disabled)
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
         .WillRepeatedly(::testing::Return("wlan0"));
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
-        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNMANAGED))
-        .WillOnce(::testing::Return(NM_DEVICE_STATE_FAILED));
+        .WillOnce(::testing::Return(NM_DEVICE_STATE_UNMANAGED));
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetWifiState"), _T(""), response));
-    EXPECT_EQ(response, _T("{\"state\":0,\"status\":\"WIFI_STATE_DISABLED\",\"success\":true}"));
+    EXPECT_EQ(response, _T("{\"state\":1,\"status\":\"WIFI_STATE_DISABLED\",\"success\":true}"));
 
     g_object_unref(deviceDummy);
     g_ptr_array_free(fakeDevices, TRUE);
