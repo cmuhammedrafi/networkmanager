@@ -87,7 +87,7 @@ public:
     static NMDhcpConfig* nm_active_connection_get_dhcp4_config(NMActiveConnection* connection);
     static NMDhcpConfig* nm_active_connection_get_dhcp6_config(NMActiveConnection* connection);
     static const char* nm_dhcp_config_get_one_option(NMDhcpConfig* config, const char* option);
-    
+
     // Access Point APIs
     static NM80211ApFlags nm_access_point_get_flags(NMAccessPoint *ap);
     static NM80211ApSecurityFlags nm_access_point_get_wpa_flags(NMAccessPoint *ap);
