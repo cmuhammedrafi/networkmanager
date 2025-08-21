@@ -48,6 +48,20 @@ public:
     virtual guint32 nm_access_point_get_max_bitrate(NMAccessPoint *ap) = 0;
     virtual guint8 nm_access_point_get_strength(NMAccessPoint *ap) = 0;
     virtual NMAccessPoint* nm_device_wifi_get_active_access_point(NMDeviceWifi *device) = 0;
+    
+    // WiFi Scan APIs
+    virtual void nm_device_wifi_request_scan_async(NMDeviceWifi *device,
+                                                  GCancellable *cancellable,
+                                                  GAsyncReadyCallback callback,
+                                                  gpointer user_data) = 0;
+    virtual void nm_device_wifi_request_scan_options_async(NMDeviceWifi *device,
+                                                          GVariant *options,
+                                                          GCancellable *cancellable,
+                                                          GAsyncReadyCallback callback,
+                                                          gpointer user_data) = 0;
+    virtual gboolean nm_device_wifi_request_scan_finish(NMDeviceWifi *device,
+                                                       GAsyncResult *result,
+                                                       GError **error) = 0;
 };
 
 class LibnmWraps {
@@ -99,4 +113,18 @@ public:
     static guint32 nm_access_point_get_max_bitrate(NMAccessPoint *ap);
     static guint8 nm_access_point_get_strength(NMAccessPoint *ap);
     static NMAccessPoint* nm_device_wifi_get_active_access_point(NMDeviceWifi *device);
+    
+    // WiFi Scan APIs
+    static void nm_device_wifi_request_scan_async(NMDeviceWifi *device,
+                                                 GCancellable *cancellable,
+                                                 GAsyncReadyCallback callback,
+                                                 gpointer user_data);
+    static void nm_device_wifi_request_scan_options_async(NMDeviceWifi *device,
+                                                         GVariant *options,
+                                                         GCancellable *cancellable,
+                                                         GAsyncReadyCallback callback,
+                                                         gpointer user_data);
+    static gboolean nm_device_wifi_request_scan_finish(NMDeviceWifi *device,
+                                                      GAsyncResult *result,
+                                                      GError **error);
 };

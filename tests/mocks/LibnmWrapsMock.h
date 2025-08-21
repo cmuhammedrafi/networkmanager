@@ -45,6 +45,20 @@ extern "C" guint32 __real_nm_access_point_get_max_bitrate(NMAccessPoint *ap);
 extern "C" guint8 __real_nm_access_point_get_strength(NMAccessPoint *ap);
 extern "C" NMAccessPoint* __real_nm_device_wifi_get_active_access_point(NMDeviceWifi *device);
 
+// WiFi Scan API real functions
+extern "C" void __real_nm_device_wifi_request_scan_async(NMDeviceWifi *device,
+                                                        GCancellable *cancellable,
+                                                        GAsyncReadyCallback callback,
+                                                        gpointer user_data);
+extern "C" void __real_nm_device_wifi_request_scan_options_async(NMDeviceWifi *device,
+                                                                GVariant *options,
+                                                                GCancellable *cancellable,
+                                                                GAsyncReadyCallback callback,
+                                                                gpointer user_data);
+extern "C" gboolean __real_nm_device_wifi_request_scan_finish(NMDeviceWifi *device,
+                                                             GAsyncResult *result,
+                                                             GError **error);
+
 class LibnmWrapsImplMock : public LibnmWrapsImpl {
 public:
     LibnmWrapsImplMock() : LibnmWrapsImpl() {
@@ -252,6 +266,25 @@ public:
             [&](NMDeviceWifi* device) -> NMAccessPoint* {
                 return __real_nm_device_wifi_get_active_access_point(device);
             }));
+            
+        // WiFi Scan API ON_CALL setups
+        ON_CALL(*this, nm_device_wifi_request_scan_async(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMDeviceWifi *device, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data) {
+                __real_nm_device_wifi_request_scan_async(device, cancellable, callback, user_data);
+            }));
+            
+        ON_CALL(*this, nm_device_wifi_request_scan_options_async(::testing::_, ::testing::_, ::testing::_, ::testing::_, ::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMDeviceWifi *device, GVariant *options, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data) {
+                __real_nm_device_wifi_request_scan_options_async(device, options, cancellable, callback, user_data);
+            }));
+            
+        ON_CALL(*this, nm_device_wifi_request_scan_finish(::testing::_, ::testing::_, ::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMDeviceWifi *device, GAsyncResult *result, GError **error) -> gboolean {
+                return __real_nm_device_wifi_request_scan_finish(device, result, error);
+            }));
     }
 
     virtual ~LibnmWrapsImplMock() = default;
@@ -296,4 +329,9 @@ public:
     MOCK_METHOD(guint32, nm_access_point_get_max_bitrate, (NMAccessPoint *ap), (override));
     MOCK_METHOD(guint8, nm_access_point_get_strength, (NMAccessPoint *ap), (override));
     MOCK_METHOD(NMAccessPoint*, nm_device_wifi_get_active_access_point, (NMDeviceWifi *device), (override));
+    
+    // WiFi Scan API mock methods
+    MOCK_METHOD(void, nm_device_wifi_request_scan_async, (NMDeviceWifi *device, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data), (override));
+    MOCK_METHOD(void, nm_device_wifi_request_scan_options_async, (NMDeviceWifi *device, GVariant *options, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data), (override));
+    MOCK_METHOD(gboolean, nm_device_wifi_request_scan_finish, (NMDeviceWifi *device, GAsyncResult *result, GError **error), (override));
 };

@@ -1185,7 +1185,7 @@ namespace WPEFramework
                 return false;
             }
             m_isSuccess = false;
-            if(!ssidReq.empty() && ssidReq != "null")
+            if(!ssidReq.empty())
             {
                 NMLOG_INFO("staring wifi scanning .. %s", ssidReq.c_str());
                 GVariantBuilder builder, array_builder;

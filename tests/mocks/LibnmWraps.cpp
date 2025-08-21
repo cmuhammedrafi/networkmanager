@@ -150,6 +150,28 @@ extern "C" NMAccessPoint* __wrap_nm_device_wifi_get_active_access_point(NMDevice
     return LibnmWraps::getInstance().nm_device_wifi_get_active_access_point(device);
 }
 
+// WiFi Scan API wrappers
+extern "C" void __wrap_nm_device_wifi_request_scan_async(NMDeviceWifi *device,
+                                                        GCancellable *cancellable,
+                                                        GAsyncReadyCallback callback,
+                                                        gpointer user_data) {
+    LibnmWraps::getInstance().nm_device_wifi_request_scan_async(device, cancellable, callback, user_data);
+}
+
+extern "C" void __wrap_nm_device_wifi_request_scan_options_async(NMDeviceWifi *device,
+                                                                GVariant *options,
+                                                                GCancellable *cancellable,
+                                                                GAsyncReadyCallback callback,
+                                                                gpointer user_data) {
+    LibnmWraps::getInstance().nm_device_wifi_request_scan_options_async(device, options, cancellable, callback, user_data);
+}
+
+extern "C" gboolean __wrap_nm_device_wifi_request_scan_finish(NMDeviceWifi *device,
+                                                             GAsyncResult *result,
+                                                             GError **error) {
+    return LibnmWraps::getInstance().nm_device_wifi_request_scan_finish(device, result, error);
+}
+
 LibnmWrapsImpl* LibnmWraps::impl = nullptr;
 LibnmWraps::LibnmWraps() {}
 
@@ -347,4 +369,29 @@ guint8 LibnmWraps::nm_access_point_get_strength(NMAccessPoint *ap) {
 NMAccessPoint* LibnmWraps::nm_device_wifi_get_active_access_point(NMDeviceWifi *device) {
     EXPECT_NE(impl, nullptr);
     return impl->nm_device_wifi_get_active_access_point(device);
+}
+
+// WiFi Scan API implementation
+void LibnmWraps::nm_device_wifi_request_scan_async(NMDeviceWifi *device,
+                                                  GCancellable *cancellable,
+                                                  GAsyncReadyCallback callback,
+                                                  gpointer user_data) {
+    EXPECT_NE(impl, nullptr);
+    impl->nm_device_wifi_request_scan_async(device, cancellable, callback, user_data);
+}
+
+void LibnmWraps::nm_device_wifi_request_scan_options_async(NMDeviceWifi *device,
+                                                          GVariant *options,
+                                                          GCancellable *cancellable,
+                                                          GAsyncReadyCallback callback,
+                                                          gpointer user_data) {
+    EXPECT_NE(impl, nullptr);
+    impl->nm_device_wifi_request_scan_options_async(device, options, cancellable, callback, user_data);
+}
+
+gboolean LibnmWraps::nm_device_wifi_request_scan_finish(NMDeviceWifi *device,
+                                                       GAsyncResult *result,
+                                                       GError **error) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_device_wifi_request_scan_finish(device, result, error);
 }
