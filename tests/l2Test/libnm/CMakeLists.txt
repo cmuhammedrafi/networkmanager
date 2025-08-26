@@ -140,6 +140,10 @@ target_link_options(${NM_LIBNM_PROXY_L2_TEST} PRIVATE
     -Wl,-wrap,nm_client_add_and_activate_connection_finish
     -Wl,-wrap,nm_device_wifi_get_access_points
     -Wl,-wrap,nm_device_get_available_connections
+    -Wl,-wrap,nm_object_get_path
+    -Wl,-wrap,nm_client_dbus_set_property
+    -Wl,-wrap,nm_client_dbus_set_property_finish
+    -Wl,-wrap,nm_device_get_active_connection
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")

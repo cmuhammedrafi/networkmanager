@@ -7,6 +7,7 @@
 
 extern "C" const char* __real_nm_device_get_iface(NMDevice* device);
 extern "C" NMActiveConnection* __real_nm_client_get_primary_connection(NMClient *client);
+extern "C" NMActiveConnection* __real_nm_device_get_active_connection(NMDevice *device);
 extern "C" NMRemoteConnection* __real_nm_active_connection_get_connection(NMActiveConnection *connection);
 extern "C" const char* __real_nm_connection_get_interface_name(NMRemoteConnection *connection);
 extern "C" NMDevice* __real_nm_client_get_device_by_iface(NMClient *client, const char *iface);
@@ -101,6 +102,19 @@ extern "C" NMRemoteConnection* __real_nm_client_add_connection2_finish(NMClient 
                                                                      GAsyncResult *result,
                                                                      GVariant **out_result,
                                                                      GError **error);
+extern "C" const char* __real_nm_object_get_path(NMObject *object);
+extern "C" void __real_nm_client_dbus_set_property(NMClient *client,
+                                                  const char *object_path,
+                                                  const char *interface_name,
+                                                  const char *property_name,
+                                                  GVariant *value,
+                                                  int timeout_msec,
+                                                  GCancellable *cancellable,
+                                                  GAsyncReadyCallback callback,
+                                                  gpointer user_data);
+extern "C" gboolean __real_nm_client_dbus_set_property_finish(NMClient *client,
+                                                            GAsyncResult *result,
+                                                            GError **error);
 
 
 class LibnmWrapsImplMock : public LibnmWrapsImpl {
@@ -198,6 +212,11 @@ public:
             .WillByDefault(::testing::Invoke(
             [&](NMClient* client) -> NMActiveConnection* {
                 return __real_nm_client_get_primary_connection(client);
+            }));
+        ON_CALL(*this, nm_device_get_active_connection(::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMDevice* device) -> NMActiveConnection* {
+                return __real_nm_device_get_active_connection(device);
             }));
         ON_CALL(*this, nm_active_connection_get_connection(::testing::_))
             .WillByDefault(::testing::Invoke(
@@ -394,8 +413,23 @@ public:
             [&](NMDevice *device) -> const GPtrArray* {
                 return __real_nm_device_get_available_connections(device);
             }));
+        ON_CALL(*this, nm_object_get_path(::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMObject *object) -> const char* {
+                return __real_nm_object_get_path(object);
+            }));
+        ON_CALL(*this, nm_client_dbus_set_property(::testing::_, ::testing::_, ::testing::_, ::testing::_, ::testing::_, ::testing::_, ::testing::_, ::testing::_, ::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMClient *client, const char *object_path, const char *interface_name, const char *property_name, GVariant *value, int timeout_msec, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data) {
+                __real_nm_client_dbus_set_property(client, object_path, interface_name, property_name, value, timeout_msec, cancellable, callback, user_data);
+            }));
+        ON_CALL(*this, nm_client_dbus_set_property_finish(::testing::_, ::testing::_, ::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMClient *client, GAsyncResult *result, GError **error) -> gboolean {
+                return __real_nm_client_dbus_set_property_finish(client, result, error);
+            }));
     }
-
+// NMActiveConnection *nm_device_get_active_connection(NMDevice *device);
     virtual ~LibnmWrapsImplMock() = default;
 
     // Mock methods
@@ -405,6 +439,7 @@ public:
     MOCK_METHOD(void, nm_device_disconnect_async, (NMDevice *device, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data), (override));
     MOCK_METHOD(gboolean, nm_device_disconnect_finish, (NMDevice *device, GAsyncResult *result, GError **error), (override));
     MOCK_METHOD(NMActiveConnection*, nm_client_get_primary_connection, (NMClient *client), (override));
+    MOCK_METHOD(NMActiveConnection*, nm_device_get_active_connection, (NMDevice *device), (override));
     MOCK_METHOD(NMRemoteConnection*, nm_active_connection_get_connection, (NMActiveConnection *connection), (override));
     MOCK_METHOD(const char*, nm_connection_get_interface_name, (NMRemoteConnection *connection), (override));
     MOCK_METHOD(NMClient*, nm_client_new, (GCancellable* cancellable, GError** error), (override));
@@ -440,6 +475,9 @@ public:
     MOCK_METHOD(NMAccessPoint*, nm_device_wifi_get_active_access_point, (NMDeviceWifi *device), (override));
     MOCK_METHOD(const GPtrArray*, nm_device_wifi_get_access_points, (NMDeviceWifi *device), (override));
     MOCK_METHOD(const GPtrArray*, nm_device_get_available_connections, (NMDevice *device), (override));
+    MOCK_METHOD(const char*, nm_object_get_path, (NMObject *object), (override));
+    MOCK_METHOD(void, nm_client_dbus_set_property, (NMClient *client, const char *object_path, const char *interface_name, const char *property_name, GVariant *value, int timeout_msec, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data), (override));
+    MOCK_METHOD(gboolean, nm_client_dbus_set_property_finish, (NMClient *client, GAsyncResult *result, GError **error), (override));
 
     // WiFi Scan API mock methods
     MOCK_METHOD(void, nm_device_wifi_request_scan_async, (NMDeviceWifi *device, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data), (override));
