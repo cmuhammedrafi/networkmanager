@@ -229,6 +229,26 @@ extern "C" gboolean __wrap_nm_client_dbus_set_property_finish(NMClient *client,
     return LibnmWraps::getInstance().nm_client_dbus_set_property_finish(client, result, error);
 }
 
+// New wrapper functions for commit changes and DHCP hostname
+extern "C" gboolean __wrap_nm_remote_connection_commit_changes(NMRemoteConnection *connection,
+                                                            gboolean save_to_disk,
+                                                            GCancellable *cancellable,
+                                                            GError **error) {
+    return LibnmWraps::getInstance().nm_remote_connection_commit_changes(connection, save_to_disk, cancellable, error);
+}
+
+extern "C" const char* __wrap_nm_setting_ip_config_get_dhcp_hostname(NMSettingIPConfig *setting) {
+    return LibnmWraps::getInstance().nm_setting_ip_config_get_dhcp_hostname(setting);
+}
+
+extern "C" gboolean __wrap_nm_setting_ip_config_get_dhcp_send_hostname(NMSettingIPConfig *setting) {
+    return LibnmWraps::getInstance().nm_setting_ip_config_get_dhcp_send_hostname(setting);
+}
+
+extern "C" void __wrap_nm_connection_add_setting(NMConnection *connection, NMSetting *setting) {
+    LibnmWraps::getInstance().nm_connection_add_setting(connection, setting);
+}
+
 // WiFi Scan API wrappers
 extern "C" void __wrap_nm_device_wifi_request_scan_async(NMDeviceWifi *device,
                                                         GCancellable *cancellable,
@@ -569,4 +589,25 @@ void LibnmWraps::nm_client_add_connection2(NMClient *client, GVariant *settings,
 NMRemoteConnection* LibnmWraps::nm_client_add_connection2_finish(NMClient *client, GAsyncResult *result, GVariant **out_result, GError **error) {
     EXPECT_NE(impl, nullptr);
     return impl->nm_client_add_connection2_finish(client, result, out_result, error);
+}
+
+// New commit and DHCP hostname implementation
+gboolean LibnmWraps::nm_remote_connection_commit_changes(NMRemoteConnection *connection, gboolean save_to_disk, GCancellable *cancellable, GError **error) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_remote_connection_commit_changes(connection, save_to_disk, cancellable, error);
+}
+
+const char* LibnmWraps::nm_setting_ip_config_get_dhcp_hostname(NMSettingIPConfig *setting) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_setting_ip_config_get_dhcp_hostname(setting);
+}
+
+gboolean LibnmWraps::nm_setting_ip_config_get_dhcp_send_hostname(NMSettingIPConfig *setting) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_setting_ip_config_get_dhcp_send_hostname(setting);
+}
+
+void LibnmWraps::nm_connection_add_setting(NMConnection *connection, NMSetting *setting) {
+    EXPECT_NE(impl, nullptr);
+    impl->nm_connection_add_setting(connection, setting);
 }

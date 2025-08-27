@@ -160,4 +160,7 @@ TEST_F(NetworkManagerInitTest, platformInit)
 
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("GetIPSettings"), _T("{\"interface\":\"wlan0\"}"), response));
     EXPECT_EQ(response, _T("{\"success\":false}"));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("SetHostname"), _T("{\"hostname\":\"test-host\"}"), response));
+    EXPECT_EQ(response, _T("{\"success\":false}"));
 }

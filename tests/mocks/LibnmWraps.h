@@ -113,6 +113,15 @@ public:
     virtual gboolean nm_client_dbus_set_property_finish(NMClient *client,
                                                       GAsyncResult *result,
                                                       GError **error) = 0;
+                                                      
+    // New commit and DHCP hostname functions
+    virtual gboolean nm_remote_connection_commit_changes(NMRemoteConnection *connection,
+                                                        gboolean save_to_disk,
+                                                        GCancellable *cancellable,
+                                                        GError **error) = 0;
+    virtual const char *nm_setting_ip_config_get_dhcp_hostname(NMSettingIPConfig *setting) = 0;
+    virtual gboolean nm_setting_ip_config_get_dhcp_send_hostname(NMSettingIPConfig *setting) = 0;
+    virtual void nm_connection_add_setting(NMConnection *connection, NMSetting *setting) = 0;
 };
 
 class LibnmWraps {
@@ -229,4 +238,13 @@ public:
     static gboolean nm_client_dbus_set_property_finish(NMClient *client,
                                                      GAsyncResult *result,
                                                      GError **error);
+                                                     
+    // New commit and DHCP hostname functions
+    static gboolean nm_remote_connection_commit_changes(NMRemoteConnection *connection,
+                                                      gboolean save_to_disk,
+                                                      GCancellable *cancellable,
+                                                      GError **error);
+    static const char *nm_setting_ip_config_get_dhcp_hostname(NMSettingIPConfig *setting);
+    static gboolean nm_setting_ip_config_get_dhcp_send_hostname(NMSettingIPConfig *setting);
+    static void nm_connection_add_setting(NMConnection *connection, NMSetting *setting);
 };
