@@ -1563,7 +1563,7 @@ TEST_F(NetworkManagerWifiTest, GetKnownSSIDs_connectionFailed)
     g_ptr_array_free(fakeDevices, TRUE);
 }
 
-TEST_F(NetworkManagerWifiTest, GetKnownSSIDs_connectionFailed_null_device)
+TEST_F(NetworkManagerWifiTest, GetKnownSSIDs_success)
 {
     GPtrArray* fakeDevices = g_ptr_array_new();
     NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
@@ -1599,6 +1599,212 @@ TEST_F(NetworkManagerWifiTest, GetKnownSSIDs_connectionFailed_null_device)
     g_ptr_array_free(fakeDevices, TRUE);
 }
 
+TEST_F(NetworkManagerWifiTest, RemoveKnownSSIDs)
+{
+    GPtrArray* fakeDevices = g_ptr_array_new();
+    NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
+    g_ptr_array_add(fakeDevices, deviceDummy);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillRepeatedly(::testing::Return(fakeDevices));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
+        .WillRepeatedly(::testing::Return("wlan0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillRepeatedly(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_connections(::testing::_))
+        .WillRepeatedly(::testing::Return(nullptr));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("RemoveKnownSSID"), _T(""), response));
+    EXPECT_EQ(response, _T("{\"success\":false}"));
+
+    g_object_unref(deviceDummy);
+    g_ptr_array_free(fakeDevices, TRUE);
+}
+
+TEST_F(NetworkManagerWifiTest, RemoveKnownSSIDs_success_false)
+{
+    GPtrArray* fakeDevices = g_ptr_array_new();
+    NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
+    g_ptr_array_add(fakeDevices, deviceDummy);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillRepeatedly(::testing::Return(fakeDevices));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
+        .WillRepeatedly(::testing::Return("wlan0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillRepeatedly(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    GPtrArray* dummyConns = g_ptr_array_new();
+    NMConnection *conn1 = reinterpret_cast<NMConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    g_ptr_array_add(dummyConns, conn1);
+    NMSettingWireless* settingWireless = reinterpret_cast<NMSettingWireless*>(g_object_new(NM_TYPE_SETTING_WIRELESS, NULL));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyConns)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_wireless(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingWireless*>(settingWireless)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_id(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<const char*>("Test_wifi")));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_remote_connection_delete(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](NMRemoteConnection *connection, GCancellable *cancellable, GError **error) -> gboolean {
+            *error = g_error_new(G_IO_ERROR, G_IO_ERROR_FAILED, "connection delete failed");
+            return FALSE;
+        }));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("RemoveKnownSSID"), _T(""), response));
+    EXPECT_EQ(response, _T("{\"success\":true}"));
+
+    g_object_unref(deviceDummy);
+    g_ptr_array_free(fakeDevices, TRUE);
+}
+
+TEST_F(NetworkManagerWifiTest, RemoveKnownSSIDs_success_true)
+{
+    GPtrArray* fakeDevices = g_ptr_array_new();
+    NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
+    g_ptr_array_add(fakeDevices, deviceDummy);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillRepeatedly(::testing::Return(fakeDevices));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
+        .WillRepeatedly(::testing::Return("wlan0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillRepeatedly(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    GPtrArray* dummyConns = g_ptr_array_new();
+    NMConnection *conn1 = reinterpret_cast<NMConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    g_ptr_array_add(dummyConns, conn1);
+    NMSettingWireless* settingWireless = reinterpret_cast<NMSettingWireless*>(g_object_new(NM_TYPE_SETTING_WIRELESS, NULL));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyConns)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_wireless(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingWireless*>(settingWireless)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_id(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<const char*>("Test_wifi")));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_remote_connection_delete(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](NMRemoteConnection *connection, GCancellable *cancellable, GError **error) -> gboolean {
+            return TRUE;
+        }));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("RemoveKnownSSID"), _T(""), response));
+    EXPECT_EQ(response, _T("{\"success\":true}"));
+
+    g_object_unref(deviceDummy);
+    g_ptr_array_free(fakeDevices, TRUE);
+}
+
+TEST_F(NetworkManagerWifiTest, RemoveKnownSSIDs_conn_id_null)
+{
+    GPtrArray* fakeDevices = g_ptr_array_new();
+    NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
+    g_ptr_array_add(fakeDevices, deviceDummy);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillRepeatedly(::testing::Return(fakeDevices));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
+        .WillRepeatedly(::testing::Return("wlan0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillRepeatedly(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    GPtrArray* dummyConns = g_ptr_array_new();
+    NMConnection *conn1 = reinterpret_cast<NMConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    g_ptr_array_add(dummyConns, conn1);
+    NMSettingWireless* settingWireless = reinterpret_cast<NMSettingWireless*>(g_object_new(NM_TYPE_SETTING_WIRELESS, NULL));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyConns)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_wireless(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingWireless*>(settingWireless)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_id(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<char*>(NULL)));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("RemoveKnownSSID"), _T(""), response));
+    EXPECT_EQ(response, _T("{\"success\":true}"));
+
+    g_object_unref(deviceDummy);
+    g_ptr_array_free(fakeDevices, TRUE);
+}
+
+TEST_F(NetworkManagerWifiTest, RemoveKnownSSIDs_success_ssid_specified_not_found)
+{
+    GPtrArray* fakeDevices = g_ptr_array_new();
+    NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
+    g_ptr_array_add(fakeDevices, deviceDummy);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillRepeatedly(::testing::Return(fakeDevices));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
+        .WillRepeatedly(::testing::Return("wlan0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillRepeatedly(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    GPtrArray* dummyConns = g_ptr_array_new();
+    NMConnection *conn1 = reinterpret_cast<NMConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    g_ptr_array_add(dummyConns, conn1);
+    NMSettingWireless* settingWireless = reinterpret_cast<NMSettingWireless*>(g_object_new(NM_TYPE_SETTING_WIRELESS, NULL));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyConns)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_wireless(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingWireless*>(settingWireless)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_id(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<const char*>("Test_wifi")));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("RemoveKnownSSID"), 
+        _T("{\"ssid\":\"TestNetwork\"}"), response));
+    EXPECT_EQ(response, _T("{\"success\":false}"));
+
+    g_object_unref(deviceDummy);
+    g_ptr_array_free(fakeDevices, TRUE);
+}
+
+TEST_F(NetworkManagerWifiTest, RemoveKnownSSIDs_success_ssid_specified_found)
+{
+    GPtrArray* fakeDevices = g_ptr_array_new();
+    NMDevice *deviceDummy = static_cast<NMDevice*>(g_object_new(NM_TYPE_DEVICE_WIFI, NULL));
+    g_ptr_array_add(fakeDevices, deviceDummy);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_devices(::testing::_))
+        .WillRepeatedly(::testing::Return(fakeDevices));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_iface(::testing::_))
+        .WillRepeatedly(::testing::Return("wlan0"));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_state(::testing::_))
+        .WillRepeatedly(::testing::Return(NM_DEVICE_STATE_ACTIVATED));
+
+    GPtrArray* dummyConns = g_ptr_array_new();
+    NMConnection *conn1 = reinterpret_cast<NMConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    g_ptr_array_add(dummyConns, conn1);
+    NMSettingWireless* settingWireless = reinterpret_cast<NMSettingWireless*>(g_object_new(NM_TYPE_SETTING_WIRELESS, NULL));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyConns)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_wireless(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingWireless*>(settingWireless)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_id(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<const char*>("TestNetwork")));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_remote_connection_delete(::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke([](NMRemoteConnection *connection, GCancellable *cancellable, GError **error) -> gboolean {
+            return TRUE;
+        }));
+
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("RemoveKnownSSID"), 
+        _T("{\"ssid\":\"TestNetwork\"}"), response));
+    EXPECT_EQ(response, _T("{\"success\":true}"));
+
+    g_object_unref(deviceDummy);
+    g_ptr_array_free(fakeDevices, TRUE);
+}
+
 TEST_F(NetworkManagerWifiTest, StopWPS)
 {
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("StopWPS"), 
@@ -1611,4 +1817,6 @@ TEST_F(NetworkManagerWifiTest, StartWPS)
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("StartWPS"), 
         _T(""), response));
     EXPECT_EQ(response, _T("{\"success\":true}"));
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("StartWPS"), 
+        _T(""), response));
 }

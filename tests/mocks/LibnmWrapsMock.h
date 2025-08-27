@@ -5,8 +5,8 @@
 #include "LibnmWraps.h"
 #include <glib.h>
 
-
 extern "C" const char* __real_nm_device_get_iface(NMDevice* device);
+extern "C" gboolean __real_nm_remote_connection_delete(NMRemoteConnection *connection, GCancellable *cancellable, GError **error);
 extern "C" NMActiveConnection* __real_nm_client_get_primary_connection(NMClient *client);
 extern "C" NMActiveConnection* __real_nm_device_get_active_connection(NMDevice *device);
 extern "C" NMRemoteConnection* __real_nm_active_connection_get_connection(NMActiveConnection *connection);
@@ -440,6 +440,11 @@ public:
             [&](NMClient *client, GAsyncResult *result, GError **error) -> gboolean {
                 return __real_nm_client_dbus_set_property_finish(client, result, error);
             }));
+        ON_CALL(*this, nm_remote_connection_delete(::testing::_, ::testing::_, ::testing::_))
+            .WillByDefault(::testing::Invoke(
+            [&](NMRemoteConnection *connection, GCancellable *cancellable, GError **error) -> gboolean {
+                return __real_nm_remote_connection_delete(connection, cancellable, error);
+            }));
     }
 // NMActiveConnection *nm_device_get_active_connection(NMDevice *device);
     virtual ~LibnmWrapsImplMock() = default;
@@ -517,4 +522,5 @@ public:
     MOCK_METHOD(GVariant*, nm_remote_connection_update2_finish, (NMRemoteConnection *connection, GAsyncResult *result, GError **error), (override));
     MOCK_METHOD(void, nm_client_add_connection2, (NMClient *client, GVariant *settings, NMSettingsAddConnection2Flags flags, GVariant *args, gboolean ignore_out_result, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data), (override));
     MOCK_METHOD(NMRemoteConnection*, nm_client_add_connection2_finish, (NMClient *client, GAsyncResult *result, GVariant **out_result, GError **error), (override));
+    MOCK_METHOD(gboolean, nm_remote_connection_delete, (NMRemoteConnection *connection, GCancellable *cancellable, GError **error), (override));
 };

@@ -124,6 +124,7 @@ public:
     virtual void nm_connection_add_setting(NMConnection *connection, NMSetting *setting) = 0;
     virtual NMSettingWireless *nm_connection_get_setting_wireless(NMConnection *connection) = 0;
     virtual GBytes *nm_setting_wireless_get_ssid(NMSettingWireless *setting) = 0;
+    virtual gboolean nm_remote_connection_delete(NMRemoteConnection *connection, GCancellable *cancellable, GError **error) = 0;
 };
 
 class LibnmWraps {
@@ -251,4 +252,5 @@ public:
     static void nm_connection_add_setting(NMConnection *connection, NMSetting *setting);
     static NMSettingWireless *nm_connection_get_setting_wireless(NMConnection *connection);
     static GBytes *nm_setting_wireless_get_ssid(NMSettingWireless *setting);
+    static gboolean nm_remote_connection_delete(NMRemoteConnection *connection, GCancellable *cancellable, GError **error);
 };

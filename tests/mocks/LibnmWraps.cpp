@@ -258,6 +258,10 @@ extern "C" GBytes* __wrap_nm_setting_wireless_get_ssid(NMSettingWireless *settin
     return LibnmWraps::getInstance().nm_setting_wireless_get_ssid(setting);
 }
 
+extern "C" gboolean __wrap_nm_remote_connection_delete(NMRemoteConnection *connection, GCancellable *cancellable, GError **error) {
+    return LibnmWraps::getInstance().nm_remote_connection_delete(connection, cancellable, error);
+}
+
 // WiFi Scan API wrappers
 extern "C" void __wrap_nm_device_wifi_request_scan_async(NMDeviceWifi *device,
                                                         GCancellable *cancellable,
@@ -629,4 +633,9 @@ NMSettingWireless* LibnmWraps::nm_connection_get_setting_wireless(NMConnection *
 GBytes* LibnmWraps::nm_setting_wireless_get_ssid(NMSettingWireless *setting) {
     EXPECT_NE(impl, nullptr);
     return impl->nm_setting_wireless_get_ssid(setting);
+}
+
+gboolean LibnmWraps::nm_remote_connection_delete(NMRemoteConnection *connection, GCancellable *cancellable, GError **error) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_remote_connection_delete(connection, cancellable, error);
 }
