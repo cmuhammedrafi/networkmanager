@@ -1500,3 +1500,33 @@ TEST_F(NetworkManagerTest, SetIPSettings_static_wlan0_autoConfTrue)
     g_object_unref(dummyRemoteConn);
 }
 
+TEST_F(NetworkManagerTest, SetIPSettings_static_wlan0_autoConffalse)
+{
+    NMActiveConnection *dummyActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
+    NMRemoteConnection *dummyRemoteConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_active_connection(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMActiveConnection*>(dummyActiveConn)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMRemoteConnection*>(dummyRemoteConn)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_ip4_config(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingIPConfig*>(NULL)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_remote_connection_commit_changes(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .WillOnce(::testing::Invoke(
+            [](NMRemoteConnection *connection, gboolean save_to_disk, GCancellable *cancellable, GError **error) -> gboolean {
+                *error = g_error_new(G_IO_ERROR, G_IO_ERROR_FAILED, "connection delete failed");
+                return false;
+            }));
+
+    std::string request = _T("{\"interface\":\"wlan0\",\"ipversion\":\"IPv4\",\"autoconfig\":false,\"ipaddress\":\"192.168.1.100\",\"prefix\":24,\"gateway\":\"192.168.1.1\",\"primarydns\":\"8.8.8.8\",\"secondarydns\":\"8.8.4.4\"}");
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("SetIPSettings"), request, response));
+    EXPECT_EQ(response, _T("{\"success\":false}"));
+
+    g_object_unref(dummyActiveConn);
+    g_object_unref(dummyRemoteConn);
+}
