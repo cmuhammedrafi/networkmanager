@@ -148,6 +148,8 @@ target_link_options(${NM_LIBNM_PROXY_L2_TEST} PRIVATE
     -Wl,-wrap,nm_setting_ip_config_get_dhcp_hostname
     -Wl,-wrap,nm_setting_ip_config_get_dhcp_send_hostname
     -Wl,-wrap,nm_connection_add_setting
+    -Wl,-wrap,nm_setting_wireless_get_ssid
+    -Wl,-wrap,nm_connection_get_setting_wireless
 )
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")

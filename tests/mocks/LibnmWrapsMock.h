@@ -3,6 +3,7 @@
 #include <gmock/gmock.h>
 #include <NetworkManager.h>
 #include "LibnmWraps.h"
+#include <glib.h>
 
 
 extern "C" const char* __real_nm_device_get_iface(NMDevice* device);
@@ -124,6 +125,8 @@ extern "C" gboolean __real_nm_remote_connection_commit_changes(NMRemoteConnectio
 extern "C" const char* __real_nm_setting_ip_config_get_dhcp_hostname(NMSettingIPConfig *setting);
 extern "C" gboolean __real_nm_setting_ip_config_get_dhcp_send_hostname(NMSettingIPConfig *setting);
 extern "C" void __real_nm_connection_add_setting(NMConnection *connection, NMSetting *setting);
+extern "C" NMSettingWireless *__real_nm_connection_get_setting_wireless(NMConnection *connection);
+extern "C" GBytes *__real_nm_setting_wireless_get_ssid(NMSettingWireless *setting);
 
 
 class LibnmWrapsImplMock : public LibnmWrapsImpl {
@@ -508,6 +511,8 @@ public:
     MOCK_METHOD(const char*, nm_setting_ip_config_get_dhcp_hostname, (NMSettingIPConfig *setting), (override));
     MOCK_METHOD(gboolean, nm_setting_ip_config_get_dhcp_send_hostname, (NMSettingIPConfig *setting), (override));
     MOCK_METHOD(void, nm_connection_add_setting, (NMConnection *connection, NMSetting *setting), (override));
+    MOCK_METHOD(NMSettingWireless*, nm_connection_get_setting_wireless, (NMConnection *connection), (override));
+    MOCK_METHOD(GBytes*, nm_setting_wireless_get_ssid, (NMSettingWireless *setting), (override));
     MOCK_METHOD(NMActiveConnection*, nm_client_add_and_activate_connection_finish, (NMClient *client, GAsyncResult *result, GError **error), (override));
     MOCK_METHOD(GVariant*, nm_remote_connection_update2_finish, (NMRemoteConnection *connection, GAsyncResult *result, GError **error), (override));
     MOCK_METHOD(void, nm_client_add_connection2, (NMClient *client, GVariant *settings, NMSettingsAddConnection2Flags flags, GVariant *args, gboolean ignore_out_result, GCancellable *cancellable, GAsyncReadyCallback callback, gpointer user_data), (override));

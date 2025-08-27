@@ -2,7 +2,7 @@
 
 #include <NetworkManager.h>
 #include <libnm/NetworkManager.h>
-#include <glib-object.h>
+#include <glib.h>
 #include <string>
 
 class LibnmWrapsImpl {
@@ -122,6 +122,8 @@ public:
     virtual const char *nm_setting_ip_config_get_dhcp_hostname(NMSettingIPConfig *setting) = 0;
     virtual gboolean nm_setting_ip_config_get_dhcp_send_hostname(NMSettingIPConfig *setting) = 0;
     virtual void nm_connection_add_setting(NMConnection *connection, NMSetting *setting) = 0;
+    virtual NMSettingWireless *nm_connection_get_setting_wireless(NMConnection *connection) = 0;
+    virtual GBytes *nm_setting_wireless_get_ssid(NMSettingWireless *setting) = 0;
 };
 
 class LibnmWraps {
@@ -247,4 +249,6 @@ public:
     static const char *nm_setting_ip_config_get_dhcp_hostname(NMSettingIPConfig *setting);
     static gboolean nm_setting_ip_config_get_dhcp_send_hostname(NMSettingIPConfig *setting);
     static void nm_connection_add_setting(NMConnection *connection, NMSetting *setting);
+    static NMSettingWireless *nm_connection_get_setting_wireless(NMConnection *connection);
+    static GBytes *nm_setting_wireless_get_ssid(NMSettingWireless *setting);
 };

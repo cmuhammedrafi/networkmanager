@@ -1335,39 +1335,107 @@ TEST_F(NetworkManagerTest, SetInterfaceState_eth0_enable_success)
     g_object_unref(deviceDummy);
     g_ptr_array_free(fakeDevices, TRUE);
 }
-/*
-TEST_F(NetworkManagerTest, SetIPSettings_static)
+
+
+TEST_F(NetworkManagerTest, SetIPSettings_interface_empty)
+{
+    // Test setting static IP configuration
+    std::string request = _T("{\"interface\":\"\",\"ipversion\":\"IPv4\",\"autoconfig\":true,\"ipaddress\":\"192.168.1.100\",\"prefix\":24,\"gateway\":\"192.168.1.1\",\"primarydns\":\"8.8.8.8\",\"secondarydns\":\"8.8.4.4\"}");
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("SetIPSettings"), request, response));
+    EXPECT_EQ(response, _T("{\"success\":false}"));
+}
+
+TEST_F(NetworkManagerTest, SetIPSettings_device_NULL)
 {
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
-        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(NULL)));
     // Test setting static IP configuration
-    std::string request = _T("{\"interface\":\"eth0\",\"ipversion\":\"IPv4\",\"autoconfig\":false,\"ipaddress\":\"192.168.1.100\",\"prefix\":24,\"gateway\":\"192.168.1.1\",\"primarydns\":\"8.8.8.8\",\"secondarydns\":\"8.8.4.4\"}");
+    std::string request = _T("{\"interface\":\"eth0\",\"ipversion\":\"IPv4\",\"autoconfig\":true,\"ipaddress\":\"192.168.1.100\",\"prefix\":24,\"gateway\":\"192.168.1.1\",\"primarydns\":\"8.8.8.8\",\"secondarydns\":\"8.8.4.4\"}");
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("SetIPSettings"), request, response));
+    EXPECT_EQ(response, _T("{\"success\":false}"));
+}
+
+TEST_F(NetworkManagerTest, SetIPSettings_Connection_NULL)
+{
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x778392)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_available_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(NULL)));
+
+    std::string request = _T("{\"interface\":\"eth0\",\"ipversion\":\"IPv4\",\"autoconfig\":true,\"ipaddress\":\"192.168.1.100\",\"prefix\":24,\"gateway\":\"192.168.1.1\",\"primarydns\":\"8.8.8.8\",\"secondarydns\":\"8.8.4.4\"}");
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("SetIPSettings"), request, response));
     EXPECT_EQ(response, _T("{\"success\":true}"));
 }
 
-TEST_F(NetworkManagerTest, SetIPSettings_static_wlan0)
+TEST_F(NetworkManagerTest, SetIPSettings_settingsNull)
 {
+    GPtrArray* dummyConns = g_ptr_array_new();
+    NMConnection *conn = static_cast<NMConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    g_ptr_array_add(dummyConns, conn);
+
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
-        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x100178)));
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x778392)));
 
-    NMActiveConnection *dummyActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));
-    NMRemoteConnection *dummyRemoteConn = static_cast<NMRemoteConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_active_connection(::testing::_))
-        .WillOnce(::testing::Return(dummyActiveConn));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_connection(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingConnection*>(NULL)));
 
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_active_connection_get_connection(dummyActiveConn))
-            .WillOnce(::testing::Return(dummyRemoteConn));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_available_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyConns)));
 
-    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_interface_name(dummyRemoteConn))
+    std::string request = _T("{\"interface\":\"eth0\",\"ipversion\":\"IPv4\",\"autoconfig\":true,\"ipaddress\":\"192.168.1.100\",\"prefix\":24,\"gateway\":\"192.168.1.1\",\"primarydns\":\"8.8.8.8\",\"secondarydns\":\"8.8.4.4\"}");
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("SetIPSettings"), request, response));
+    EXPECT_EQ(response, _T("{\"success\":true}"));
+}
+
+TEST_F(NetworkManagerTest, SetIPSettings_Connection)
+{
+    GPtrArray* dummyConns = g_ptr_array_new();
+    NMConnection *conn = static_cast<NMConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    g_ptr_array_add(dummyConns, conn);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x778392)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_connection(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingConnection*>(0x778394)));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_setting_connection_get_interface_name(::testing::_))
         .WillOnce(::testing::Return("wlan0"));
 
-    g_object_unref(dummyActiveConn);
-    g_object_unref(dummyRemoteConn);
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_available_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyConns)));
 
-    std::string request = _T("{\"interface\":\"wlan0\",\"ipversion\":\"IPv4\",\"autoconfig\":false,\"ipaddress\":\"192.168.1.100\",\"prefix\":24,\"gateway\":\"192.168.1.1\",\"primarydns\":\"8.8.8.8\",\"secondarydns\":\"8.8.4.4\"}");
+    std::string request = _T("{\"interface\":\"eth0\",\"ipversion\":\"IPv4\",\"autoconfig\":true,\"ipaddress\":\"192.168.1.100\",\"prefix\":24,\"gateway\":\"192.168.1.1\",\"primarydns\":\"8.8.8.8\",\"secondarydns\":\"8.8.4.4\"}");
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("SetIPSettings"), request, response));
-    EXPECT_EQ(response, _T("{\"success\":false}"));
+    EXPECT_EQ(response, _T("{\"success\":true}"));
+}
+
+TEST_F(NetworkManagerTest, SetIPSettings_Connection_eth0)
+{
+    GPtrArray* dummyConns = g_ptr_array_new();
+    NMConnection *conn = static_cast<NMConnection*>(g_object_new(NM_TYPE_REMOTE_CONNECTION, NULL));
+    g_ptr_array_add(dummyConns, conn);
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_client_get_device_by_iface(::testing::_, ::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMDevice*>(0x778392)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_connection(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingConnection*>(0x778394)));
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_setting_connection_get_interface_name(::testing::_))
+        .WillOnce(::testing::Return("eth0"));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_available_connections(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<GPtrArray*>(dummyConns)));
+    
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_setting_ip4_config(::testing::_))
+        .WillOnce(::testing::Return(reinterpret_cast<NMSettingIPConfig*>(0x100173)));
+
+    EXPECT_CALL(*p_libnmWrapsImplMock, nm_setting_ip_config_get_method(::testing::_))
+        .WillOnce(::testing::Return("auto"));
+
+    std::string request = _T("{\"interface\":\"eth0\",\"ipversion\":\"IPv4\",\"autoconfig\":true,\"ipaddress\":\"192.168.1.100\",\"prefix\":24,\"gateway\":\"192.168.1.1\",\"primarydns\":\"8.8.8.8\",\"secondarydns\":\"8.8.4.4\"}");
+    EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("SetIPSettings"), request, response));
+    EXPECT_EQ(response, _T("{\"success\":true}"));
 }
 
 TEST_F(NetworkManagerTest, SetIPSettings_static_wlan0_activeNull)
@@ -1379,10 +1447,7 @@ TEST_F(NetworkManagerTest, SetIPSettings_static_wlan0_activeNull)
     EXPECT_CALL(*p_libnmWrapsImplMock, nm_device_get_active_connection(::testing::_))
         .WillOnce(::testing::Return(reinterpret_cast<NMActiveConnection*>(NULL)));
 
-    // EXPECT_CALL(*p_libnmWrapsImplMock, nm_connection_get_interface_name(dummyRemoteConn))
-    //     .WillOnce(::testing::Return("wlan0"));
-
-    std::string request = _T("{\"interface\":\"wlan0\",\"ipversion\":\"IPv4\",\"autoconfig\":false,\"ipaddress\":\"192.168.1.100\",\"prefix\":24,\"gateway\":\"192.168.1.1\",\"primarydns\":\"8.8.8.8\",\"secondarydns\":\"8.8.4.4\"}");
+    std::string request = _T("{\"interface\":\"wlan0\",\"ipversion\":\"IPv4\",\"autoconfig\":true,\"ipaddress\":\"192.168.1.100\",\"prefix\":24,\"gateway\":\"192.168.1.1\",\"primarydns\":\"8.8.8.8\",\"secondarydns\":\"8.8.4.4\"}");
     EXPECT_EQ(Core::ERROR_NONE, handler.Invoke(connection, _T("SetIPSettings"), request, response));
     EXPECT_EQ(response, _T("{\"success\":false}"));
 
@@ -1407,7 +1472,7 @@ TEST_F(NetworkManagerTest, SetIPSettings_static_wlan0_active_remoteNull)
 
     g_object_unref(dummyActiveConn);
 }
-*/
+
 TEST_F(NetworkManagerTest, SetIPSettings_static_wlan0_autoConfTrue)
 {
     NMActiveConnection *dummyActiveConn = static_cast<NMActiveConnection*>(g_object_new(NM_TYPE_ACTIVE_CONNECTION, NULL));

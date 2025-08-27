@@ -1,5 +1,6 @@
 #include "LibnmWraps.h"
 #include <gmock/gmock.h>
+#include <glib.h>
 
 extern "C" gint64 __wrap_nm_device_wifi_get_last_scan(NMDeviceWifi *device) {
     return LibnmWraps::getInstance().nm_device_wifi_get_last_scan(device);
@@ -247,6 +248,14 @@ extern "C" gboolean __wrap_nm_setting_ip_config_get_dhcp_send_hostname(NMSetting
 
 extern "C" void __wrap_nm_connection_add_setting(NMConnection *connection, NMSetting *setting) {
     LibnmWraps::getInstance().nm_connection_add_setting(connection, setting);
+}
+
+extern "C" NMSettingWireless* __wrap_nm_connection_get_setting_wireless(NMConnection *connection) {
+    return LibnmWraps::getInstance().nm_connection_get_setting_wireless(connection);
+}
+
+extern "C" GBytes* __wrap_nm_setting_wireless_get_ssid(NMSettingWireless *setting) {
+    return LibnmWraps::getInstance().nm_setting_wireless_get_ssid(setting);
 }
 
 // WiFi Scan API wrappers
@@ -610,4 +619,14 @@ gboolean LibnmWraps::nm_setting_ip_config_get_dhcp_send_hostname(NMSettingIPConf
 void LibnmWraps::nm_connection_add_setting(NMConnection *connection, NMSetting *setting) {
     EXPECT_NE(impl, nullptr);
     impl->nm_connection_add_setting(connection, setting);
+}
+
+NMSettingWireless* LibnmWraps::nm_connection_get_setting_wireless(NMConnection *connection) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_connection_get_setting_wireless(connection);
+}
+
+GBytes* LibnmWraps::nm_setting_wireless_get_ssid(NMSettingWireless *setting) {
+    EXPECT_NE(impl, nullptr);
+    return impl->nm_setting_wireless_get_ssid(setting);
 }
